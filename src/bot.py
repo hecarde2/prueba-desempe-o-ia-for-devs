@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
@@ -6,9 +7,10 @@ from src.config import TELEGRAM_BOT_TOKEN, HUMAN_AGENT_CHAT_ID
 
 logging.basicConfig(level=logging.INFO)
 
+
 class TelegramRAGBot:
-    def __init__(self):
-        self.rag_engine = RAGEngine()
+    def __init__(self, rag_engine: RAGEngine | None = None):
+        self.rag_engine = rag_engine or RAGEngine()
         self.human_agent_id = HUMAN_AGENT_CHAT_ID
         self.token = TELEGRAM_BOT_TOKEN
 
@@ -40,8 +42,14 @@ class TelegramRAGBot:
             )
 
     def run(self):
+        if not self.token:
+            print("Telegram deshabilitado: faltan las credenciales de TELEGRAM_BOT_TOKEN.")
+            return False
+
+        asyncio.set_event_loop(asyncio.new_event_loop())
         app = ApplicationBuilder().token(self.token).build()
         app.add_handler(CommandHandler("start", self.start))
         app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), self.handle_message))
-        print("Bot iniciado exitosamente...")
+        print("Bot de Telegram iniciado exitosamente...")
         app.run_polling()
+        return True

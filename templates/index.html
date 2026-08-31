@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sora AI Support</title>
+    <style>
+      :root {
+        --bg: #0f172a;
+        --panel: #111827;
+        --panel-soft: #1f2937;
+        --primary: #22c55e;
+        --secondary: #38bdf8;
+        --text: #e5e7eb;
+        --muted: #94a3b8;
+        --user: #14532d;
+        --bot: #1e293b;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background: linear-gradient(135deg, #020817, var(--bg));
+        color: var(--text);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .app {
+        width: min(900px, 95vw);
+        background: rgba(15, 23, 42, 0.9);
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        border-radius: 18px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+        overflow: hidden;
+      }
+
+      .topbar {
+        background: rgba(15, 23, 42, 0.95);
+        padding: 16px 20px;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .title {
+        font-size: 1.2rem;
+        font-weight: 700;
+      }
+
+      .status {
+        background: rgba(34, 197, 94, 0.12);
+        color: #86efac;
+        border: 1px solid rgba(34, 197, 94, 0.3);
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: 0.8rem;
+      }
+
+      .chat {
+        height: 60vh;
+        min-height: 420px;
+        overflow-y: auto;
+        padding: 20px;
+        background: rgba(15, 23, 42, 0.6);
+      }
+
+      .msg {
+        display: flex;
+        margin-bottom: 14px;
+      }
+
+      .msg.user { justify-content: flex-end; }
+      .msg.bot { justify-content: flex-start; }
+
+      .bubble {
+        max-width: 72%;
+        padding: 12px 14px;
+        border-radius: 16px;
+        line-height: 1.5;
+        white-space: pre-wrap;
+      }
+
+      .msg.user .bubble {
+        background: var(--user);
+        border-bottom-right-radius: 4px;
+      }
+
+      .msg.bot .bubble {
+        background: var(--bot);
+        border: 1px solid rgba(148, 163, 184, 0.15);
+        border-bottom-left-radius: 4px;
+      }
+
+      .composer {
+        display: flex;
+        gap: 12px;
+        padding: 16px 20px 20px;
+        background: rgba(15, 23, 42, 0.9);
+        border-top: 1px solid rgba(148, 163, 184, 0.2);
+      }
+
+      input {
+        flex: 1;
+        border: 1px solid rgba(148, 163, 184, 0.3);
+        background: rgba(15, 23, 42, 0.8);
+        color: var(--text);
+        border-radius: 12px;
+        padding: 14px 16px;
+        font-size: 1rem;
+      }
+
+      button {
+        border: none;
+        background: linear-gradient(135deg, var(--secondary), var(--primary));
+        color: #062012;
+        font-weight: 700;
+        border-radius: 12px;
+        padding: 0 22px;
+        cursor: pointer;
+      }
+
+      .hint {
+        padding: 0 20px 18px;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <div class="topbar">
+        <div class="title">Sora · Asistente de la Academia</div>
+        <div class="status">Online</div>
+      </div>
+
+      <div class="chat" id="chat"></div>
+
+      <div class="composer">
+        <input id="message" type="text" placeholder="Escribe tu consulta sobre cursos, precios o matrícula..." />
+        <button id="sendBtn">Enviar</button>
+      </div>
+      <div class="hint">Prueba preguntas como: “¿Qué requisitos tiene el curso de bots con Telegram?” o “¿Cuáles son los precios?”</div>
+    </div>
+
+    <script>
+      const chat = document.getElementById('chat');
+      const input = document.getElementById('message');
+      const sendBtn = document.getElementById('sendBtn');
+
+      function addMessage(text, sender = 'bot') {
+        const row = document.createElement('div');
+        row.className = `msg ${sender}`;
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble';
+        bubble.textContent = text;
+        row.appendChild(bubble);
+        chat.appendChild(row);
+        chat.scrollTop = chat.scrollHeight;
+      }
+
+      function sendMessage() {
+        const text = input.value.trim();
+        if (!text) return;
+
+        addMessage(text, 'user');
+        input.value = '';
+        input.disabled = true;
+        sendBtn.disabled = true;
+
+        fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text })
+        })
+        .then(async (res) => {
+          const data = await res.json();
+          if (!res.ok) {
+            throw new Error(data.error || 'Error al consultar');
+          }
+          addMessage(data.answer || 'Sin respuesta', 'bot');
+        })
+        .catch((error) => {
+          addMessage('No pude responder ahora mismo. Revisa que la base de conocimientos esté disponible.', 'bot');
+          console.error(error);
+        })
+        .finally(() => {
+          input.disabled = false;
+          sendBtn.disabled = false;
+          input.focus();
+        });
+      }
+
+      sendBtn.addEventListener('click', sendMessage);
+      input.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          sendMessage();
+        }
+      });
+
+      addMessage('¡Hola! Soy Sora, la asistente virtual de la Academia de Tecnología e IA. ¿En qué te puedo ayudar?', 'bot');
+    </script>
+  </body>
+</html>

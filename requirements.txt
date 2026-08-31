@@ -6,3 +6,4 @@ langchain-text-splitters==0.0.2
 pypdf==4.2.0
 python-dotenv==1.0.1
 faiss-cpu==1.8.0
+Flask==3.0.3
