@@ -1,5 +1,6 @@
 import os
 import re
+import unicodedata
 
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_community.vectorstores import FAISS
@@ -17,7 +18,8 @@ SEARCH_ALIASES = {
     "requisito": ["requisito", "prerrequisito", "preparacion", "preparación", "antes de empezar", "necesita", "necesitas"],
     "precio": ["precio", "cost", "costo", "cuanto", "cuánto", "pago", "descuento", "tarifa", "valor", "cuesta", "cuestan", "precio del curso"],
     "reembolso": ["reembolso", "devolucion", "devolución", "cancelacion", "cancelación", "refund", "satisfecho", "quedo satisfecho", "devolucion del 100%"],
-    "inscripcion": ["inscrib", "matricula", "matrícula", "registro", "inicio", "horario", "fecha", "clases", "cuotas", "financiamiento", "plazo"],
+    "inscripcion": ["inscrib", "matricula", "matrícula", "registro", "inicio", "fecha", "clases", "cuotas", "financiamiento", "plazo"],
+    "horario": ["horario", "atencion", "atención", "soporte", "cuando abren", "cuando esta abierto"],
 }
 
 SYSTEM_PROMPT = """You are "Sora", the AI support assistant for the Academia de Tecnología e IA.
@@ -108,7 +110,9 @@ class RAGEngine:
             self.vector_store = None
 
     def _normalize(self, text: str) -> str:
-        return re.sub(r"[^a-z0-9áéíóúñü\s]", " ", text.lower())
+        normalized = unicodedata.normalize('NFKD', text.lower())
+        normalized = ''.join(ch for ch in normalized if not unicodedata.combining(ch))
+        return re.sub(r"[^a-z0-9\s]", " ", normalized)
 
     def _offline_search(self, question: str):
         if not self.raw_documents:
@@ -128,65 +132,98 @@ class RAGEngine:
                     score += 2
             for category, aliases in SEARCH_ALIASES.items():
                 if any(alias in normalized_question for alias in aliases):
-                    if category in ["requisito", "precio", "reembolso", "inscripcion"]:
+                    if category in ["requisito", "precio", "reembolso", "inscripcion", "horario"]:
                         if any(alias in text for alias in aliases):
-                            score += 5
+                            score += 6
+            if "curso" in normalized_question and ("telegram" in text or "python" in text or "prompt" in text):
+                score += 4
             if score:
                 scored.append((score, document))
 
         scored.sort(key=lambda item: item[0], reverse=True)
         return [doc for _, doc in scored[:3]]
 
+    def _best_matching_lines(self, question: str, lines):
+        normalized_question = self._normalize(question)
+        tokens = {token for token in normalized_question.split() if token}
+        scored = []
+
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            normalized_line = self._normalize(stripped)
+            score = 0
+            for token in tokens:
+                if token in normalized_line:
+                    score += 3
+            if any(keyword in normalized_line for keyword in ["curso", "bot", "telegram", "precio", "requisito", "reembolso", "inscripcion", "horario", "soporte", "admisiones"]):
+                score += 2
+            if any(keyword in normalized_line for keyword in ["bots con telegram", "python para ciencia", "prompt engineering", "reembolso", "prerrequisitos", "horarios de atencion", "ventas", "admisiones"]):
+                score += 4
+            if score > 0:
+                scored.append((score, stripped))
+
+        scored.sort(key=lambda item: item[0], reverse=True)
+        return [line for _, line in scored[:4]]
+
     def _offline_response(self, question: str, docs):
-        if not docs:
+        if not docs and not self.raw_documents:
             return {
                 "action": "escalate",
                 "message": "Todavía no tengo información suficiente en esta base de conocimiento para responderte. Puedes intentar otra pregunta o contactar con un asesor humano.",
                 "mode": "offline",
             }
 
-        text = "\n".join(doc.page_content for doc in docs)
-        lowered = text.lower()
+        text = "\n".join(doc.page_content for doc in (docs or self.raw_documents))
         q = self._normalize(question)
+        lowered = text.lower()
+        q_lower = question.lower()
 
-        topic_hits = {
-            "precio": any(token in q for token in SEARCH_ALIASES["precio"]),
-            "requisito": any(token in q for token in SEARCH_ALIASES["requisito"]),
-            "reembolso": any(token in q for token in SEARCH_ALIASES["reembolso"]),
-            "inscripcion": any(token in q for token in SEARCH_ALIASES["inscripcion"]),
-        }
-
-        if topic_hits["precio"]:
-            prices = re.findall(r"\$\d+\s*USD|\$\d+", text)
+        if any(token in q for token in ["cuanto", "precio", "costo", "descuento", "tarifa", "valor", "cuesta"]):
+            prices = re.findall(r"\$\s*\d+(?:\.\d+)?\s*USD", text, flags=re.IGNORECASE)
             if prices:
-                return {"action": "reply", "message": "Según la base de conocimiento: " + "; ".join(prices) + ".", "mode": "offline"}
+                unique_prices = []
+                seen = set()
+                for price in prices:
+                    clean = re.sub(r"\s+", "", price)
+                    if clean not in seen:
+                        unique_prices.append(clean)
+                        seen.add(clean)
+                if unique_prices:
+                    return {"action": "reply", "message": "Según la base de conocimiento: " + "; ".join(unique_prices[:10]) + ".", "mode": "offline"}
 
-        if topic_hits["requisito"]:
-            match = re.search(r"prerrequisitos?:?[^\n]*\n?[^\n]*", text, flags=re.IGNORECASE)
-            if match:
-                return {"action": "reply", "message": match.group(0).strip(), "mode": "offline"}
-
+        if any(token in q for token in ["requisito", "prerrequisito", "necesita", "necesitas", "antes de empezar"]):
             for line in text.splitlines():
                 if "prerrequisitos" in line.lower() or "requisitos" in line.lower():
                     return {"action": "reply", "message": line.strip(), "mode": "offline"}
 
-        if topic_hits["reembolso"]:
-            if "garantía de reembolso" in lowered or "devolución del 100%" in lowered or "si no quedas satisfecho" in lowered:
+        if any(token in q for token in ["reembolso", "devolucion", "cancelacion", "satisfecho", "refund"]):
+            if "garantia de reembolso" in lowered or "devolucion del 100%" in lowered or "si no quedas satisfecho" in lowered:
                 return {
                     "action": "reply",
                     "message": "La política indica que puedes solicitar la devolución del 100% de tu dinero dentro de los primeros 7 días naturales tras el inicio del curso si no quedas satisfecho.",
                     "mode": "offline",
                 }
 
-        if topic_hits["inscripcion"]:
-            lines = [line.strip() for line in text.splitlines() if "pasos" in line.lower() or "fechas" in line.lower() or "inicio" in line.lower() or "matricul" in line.lower()]
-            if lines:
-                return {"action": "reply", "message": " ".join(lines[:3]), "mode": "offline"}
+        if any(token in q for token in ["inscrib", "matricula", "registro", "inicio", "fecha", "cohorte", "plazo"]):
+            if "flujo del proceso de inscripcion" in lowered or "solicitud" in lowered or "seleccion" in lowered:
+                return {
+                    "action": "reply",
+                    "message": "El proceso de inscripción es: completar la solicitud, elegir cohorte y horario, pagar o adjuntar comprobante, confirmar la validación y recibir acceso al LMS.",
+                    "mode": "offline",
+                }
 
-        if any(alias in q for alias in SEARCH_ALIASES["requisito"]):
+        if any(token in q for token in ["horario", "atencion", "atención", "soporte", "abierto"]):
             for line in text.splitlines():
-                if "prerrequisitos" in line.lower() or "requisitos" in line.lower():
+                if "horarios de atencion" in line.lower() or "horarios de atención" in line.lower() or "atencion administrativa" in line.lower() or "atención administrativa" in line.lower():
                     return {"action": "reply", "message": line.strip(), "mode": "offline"}
+
+        best_lines = self._best_matching_lines(question, text.splitlines())
+        if best_lines:
+            combined = " ".join(best_lines[:2])
+            if len(combined) > 30:
+                return {"action": "reply", "message": combined, "mode": "offline"}
 
         return {
             "action": "escalate",
@@ -209,7 +246,11 @@ class RAGEngine:
                 last_error = None
                 for model_name in GEMINI_CHAT_MODELS:
                     try:
-                        llm = ChatGoogleGenerativeAI(model=model_name, temperature=0.1)
+                        llm = ChatGoogleGenerativeAI(
+                            model=model_name,
+                            temperature=0.1,
+                            max_retries=0,
+                        )
                         messages = [
                             {"role": "system", "content": SYSTEM_PROMPT},
                             {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"},
@@ -229,12 +270,17 @@ class RAGEngine:
                         return result
                     except Exception as exc:  # pragma: no cover
                         last_error = exc
-                        print(f"Modelo Gemini {model_name} no disponible: {exc}")
+                        msg = str(exc).lower()
+                        if "429" in str(exc) or "quota" in msg or "resourceexhausted" in msg:
+                            print(f"Gemini alcanzó cuota o límite: {exc}")
+                        else:
+                            print(f"Modelo Gemini {model_name} no disponible: {exc}")
 
                 print(f"Ningún modelo Gemini disponible; usando fallback offline. Último error: {last_error}")
             except Exception as exc:  # pragma: no cover
                 print(f"Gemini no disponible; usando fallback offline. Detalle: {exc}")
 
+        # Fallback inmediato para evitar esperas largas cuando Gemini está agotado por cuota.
         docs = self._offline_search(question)
         result = self._offline_response(question, docs)
         self.cache[normalized_q] = result
