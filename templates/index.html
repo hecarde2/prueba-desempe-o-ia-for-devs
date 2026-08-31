@@ -47,6 +47,38 @@
         align-items: center;
       }
 
+      .info-bar {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+        padding: 12px 16px;
+        background: rgba(15, 23, 42, 0.7);
+        border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+      }
+
+      .info-pill {
+        background: rgba(56, 189, 248, 0.08);
+        border: 1px solid rgba(56, 189, 248, 0.25);
+        border-radius: 12px;
+        padding: 10px 12px;
+      }
+
+      .info-label {
+        display: block;
+        color: var(--muted);
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 4px;
+      }
+
+      .info-value {
+        display: block;
+        font-size: 0.92rem;
+        line-height: 1.4;
+        color: var(--text);
+      }
+
       .title {
         font-size: 1.2rem;
         font-weight: 700;
@@ -138,6 +170,8 @@
         <div class="status">Online</div>
       </div>
 
+      <div class="info-bar" id="infoBar"></div>
+
       <div class="chat" id="chat"></div>
 
       <div class="composer">
@@ -151,6 +185,47 @@
       const chat = document.getElementById('chat');
       const input = document.getElementById('message');
       const sendBtn = document.getElementById('sendBtn');
+
+      function renderInfoBar(items) {
+        const bar = document.getElementById('infoBar');
+        bar.innerHTML = '';
+
+        items.forEach((item) => {
+          const pill = document.createElement('div');
+          pill.className = 'info-pill';
+
+          const label = document.createElement('span');
+          label.className = 'info-label';
+          label.textContent = item.label;
+
+          const value = document.createElement('span');
+          value.className = 'info-value';
+          value.textContent = item.value;
+
+          pill.appendChild(label);
+          pill.appendChild(value);
+          bar.appendChild(pill);
+        });
+      }
+
+      function loadDefaultInfo() {
+        fetch('/api/info')
+          .then((response) => response.json())
+          .then((data) => {
+            const items = data.items || [];
+            if (items.length) {
+              renderInfoBar(items);
+            }
+          })
+          .catch(() => {
+            renderInfoBar([
+              { label: 'Cursos', value: 'Bots · Data Science · Prompt Engineering' },
+              { label: 'Precio', value: '$150 USD · $280 USD · $160 USD' },
+              { label: 'Soporte', value: 'soporte@academiatech.com' },
+              { label: 'Horario', value: 'Lun-Vie 8:00-18:00 GMT-5' }
+            ]);
+          });
+      }
 
       function addMessage(text, sender = 'bot') {
         const row = document.createElement('div');
@@ -202,6 +277,7 @@
         }
       });
 
+      loadDefaultInfo();
       addMessage('¡Hola! Soy Sora, la asistente virtual de la Academia de Tecnología e IA. ¿En qué te puedo ayudar?', 'bot');
     </script>
   </body>
