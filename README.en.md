@@ -1,87 +1,143 @@
-# AI Customer Support Bot (Telegram + Gemini RAG)
+# AI Academic Support Assistant
 
-An automated customer support Telegram bot using **RAG (Retrieval-Augmented Generation)** to answer questions about courses, pricing, enrollments, and refunds for an academy, with the ability to escalate unanswered queries to a human agent.
+This application combines a web interface, a Telegram bot, and an RAG engine to answer questions about courses, pricing, enrollments, refunds, and support for an academy.
+
+It works with two layers:
+- a Gemini-powered layer when the API key and quota are available
+- a local fallback layer based on the business knowledge base, which keeps the app working even if external services fail or are unavailable
+
+## Goal
+
+- Answer only with information from the business knowledge base.
+- Escalate questions outside the supported scope.
+- Keep the app operational even when Gemini is down, over quota, or using an unsupported model.
+- Support both web and Telegram interfaces in a single project.
 
 ## Tech Stack
 
-- **Python** 3.10+
-- **Telegram** — bot interface via `python-telegram-bot`
-- **LangChain** — RAG flow orchestration
-- **FAISS** — vector database for context retrieval
-- **Google Gemini** — embeddings (`text-embedding-004`) and LLM (`gemini-1.5-flash`)
-- **PyPDF** — PDF document parsing
-
-## Architecture
-
-1. **Telegram Interface**: built with `python-telegram-bot` in polling mode.
-2. **RAG Core**: loads documents from `documents/`, splits them into chunks, and builds a FAISS index using Gemini embeddings.
-3. **LLM**: `gemini-1.5-flash` with low temperature (0.1), strict grounding rules, and few-shot examples.
-4. **Caching Layer**: an in-memory dictionary caches repeated queries to optimize API usage and response times.
-5. **Human Escalation**: when a question cannot be answered from the available context, a human agent is notified via Telegram.
+- Python 3.10+
+- Flask for the web interface
+- python-telegram-bot for Telegram
+- LangChain and FAISS for RAG
+- Google Gemini for LLM and embeddings
+- Markdown and local knowledge files in documents/
 
 ## Project Structure
 
-```
+```text
 .
-├── main.py                      # Entry point (starts the bot)
-├── requirements.txt             # Python dependencies
-├── .env.example                 # Environment variable template
-├── .gitignore                   # Files excluded from version control
-├── documents/                   # Knowledge base
+├── main.py
+├── requirements.txt
+├── .env.example
+├── .env
+├── README.md
+├── README.en.md
+├── documents/
 │   └── base_conocimiento.md
-└── src/
-    ├── __init__.py              # Marks `src/` as a Python package
-    ├── config.py                # Loads and validates environment variables
-    ├── bot.py                   # Telegram bot logic
-    └── rag_engine.py            # RAG pipeline (documents, vectors, LLM)
+├── src/
+│   ├── __init__.py
+│   ├── bot.py
+│   ├── config.py
+│   ├── rag_engine.py
+│   └── web_app.py
+└── templates/
+    └── index.html
 ```
 
 ## Prerequisites
 
-- Python 3.10 or higher
-- Google Gemini API key (from [Google AI Studio](https://aistudio.google.com/))
-- Telegram bot token (obtained via [@BotFather](https://t.me/BotFather))
+- Python 3.10 or newer
+- Recommended virtual environment
+- Telegram bot token generated with @BotFather
+- Google Gemini API key from Google AI Studio
 
-## Installation
+## Configuration
 
-1. **Clone the repository and install dependencies** (a virtual environment is recommended):
+1. Create a virtual environment:
 
-   ```bash
-   python -m venv venv
-   source venv/bin/activate        # On Windows: venv\Scripts\activate
-   pip install -r requirements.txt
-   ```
+```bash
+python -m venv venv
+source venv/bin/activate
+```
 
-2. **Configure environment variables**:
+2. Install dependencies:
 
-   ```bash
-   cp .env.example .env
-   ```
+```bash
+pip install -r requirements.txt
+```
 
-   Edit `.env` and fill in your credentials:
+3. Create the environment file:
 
-   | Variable | Description |
-   | :--- | :--- |
-   | `TELEGRAM_BOT_TOKEN` | Your bot token (from @BotFather) |
-   | `GOOGLE_API_KEY` | Google Gemini API key |
-   | `HUMAN_AGENT_CHAT_ID` | Telegram chat ID of the human agent |
+```bash
+cp .env.example .env
+```
 
-3. **Add the knowledge base**: place your documents in the `documents/` folder. Supported formats are **PDF**, **Markdown (`.md`)**, and **text (`.txt`)**.
+4. Fill in the variables in `.env`:
 
-4. **Run the application**:
+```env
+TELEGRAM_BOT_TOKEN=
+GOOGLE_API_KEY=
+GEMINI_MODEL=gemini-2.5-flash-lite
+GEMINI_EMBEDDING_MODEL=models/gemini-embedding-001
+HUMAN_AGENT_CHAT_ID=0
+```
 
-   ```bash
-   python main.py
-   ```
+Important notes:
+- Do not hardcode any API keys in the source code.
+- `HUMAN_AGENT_CHAT_ID` must be the chat ID for the human support agent.
+- If `TELEGRAM_BOT_TOKEN` is missing, the app runs the web interface but not the Telegram bot.
 
-## Grounding & Escalation Rules
+## Running the app
 
-- Low LLM temperature (`0.1`) minimizes hallucination risks.
-- If the answer is not explicitly present in the knowledge base, the bot replies with `ESCALATE_TO_HUMAN`.
-- The system automatically forwards the unanswered query to the human agent's chat defined in `HUMAN_AGENT_CHAT_ID`.
+From the project root:
 
-## Security Notes
+```bash
+source venv/bin/activate
+python main.py
+```
 
-- **Never** commit your `.env` file to the repository. It contains sensitive credentials.
-- The `.gitignore` already excludes `.env`, `venv/`, and `__pycache__/`.
-- If a key was ever exposed publicly, revoke it and generate a new one immediately.
+You can also force a port explicitly:
+
+```bash
+PORT=5010 python main.py
+```
+
+The app automatically picks a free port if the preferred one is already occupied.
+
+## How it works
+
+1. Loads the knowledge base from the documents folder.
+2. Searches for relevant context using similarity retrieval.
+3. Tries Gemini when the API is available and the account has quota.
+4. Falls back to the local business knowledge base if Gemini is unavailable, over quota, or using an unsupported model.
+5. Escalates to a human agent when the question is outside the scope or the documentation does not provide an answer.
+
+## Grounding rules
+
+- Answers must be based only on the local business documents.
+- If the information is not explicitly present in the knowledge base, the assistant should escalate instead of guessing.
+- The app keeps a concise, natural Spanish tone while staying business-grounded.
+
+## Security
+
+- `.env` must not be committed to the repository.
+- Keys are loaded through environment variables.
+- Secrets are not embedded in the source code or logs.
+
+## Verification performed
+
+This project was validated in real execution to confirm that:
+- the web app responds correctly
+- the Telegram bot starts without breaking the app
+- the local fallback works when Gemini is unavailable
+- the application does not crash on API quota or model compatibility errors
+
+## Access URL
+
+After startup, the interface is available at:
+
+```text
+http://localhost:5010
+```
+
+If port 5010 is busy, the app will attempt another free port automatically.

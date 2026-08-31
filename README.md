@@ -1,87 +1,143 @@
-# Bot de Soporte al Cliente con IA (Telegram + Gemini RAG)
+# Asistente IA para soporte academico
 
-Bot de atención al cliente automatizado para Telegram que usa **RAG (Retrieval-Augmented Generation)** para responder consultas sobre cursos, precios, inscripciones y reembolsos de una academia, con la capacidad de escalar preguntas no resueltas a un asesor humano.
+Aplicación que combina una interfaz web, un bot de Telegram y un motor RAG para responder consultas sobre cursos, precios, inscripciones, reembolsos y soporte de una academia.
 
-## Tecnologías
+La app funciona con dos capas:
+- una capa inteligente con Gemini cuando la clave y la cuota están disponibles
+- una capa local robusta basada en la base de conocimiento del negocio, que responde sin romper la app si Gemini no está disponible, está sobre cuota, o usa un modelo no compatible.
 
-- **Python** 3.10+
-- **Telegram** — interfaz del bot vía `python-telegram-bot`
-- **LangChain** — orquestación del flujo RAG
-- **FAISS** — base de datos vectorial para búsqueda de contexto
-- **Google Gemini** — embeddings (`text-embedding-004`) y LLM (`gemini-1.5-flash`)
-- **PyPDF** — lectura de documentos PDF
+## Objetivo
 
-## Arquitectura
+- Responder consultas solo con la información del negocio.
+- Escalar automáticamente cuando la pregunta está fuera de scope o no está en la documentación.
+- Mantener la app operativa aunque la API externa falle.
+- Soportar interfaz web y Telegram en el mismo proyecto.
 
-1. **Interfaz de Telegram**: construida con `python-telegram-bot` en modo *polling*.
-2. **Núcleo RAG**: carga documentos desde `documents/`, los divide en fragmentos y crea un índice FAISS con embeddings de Gemini.
-3. **LLM**: `gemini-1.5-flash` con temperatura baja (0.1), reglas estrictas de anclaje a la base de conocimientos y ejemplos *few-shot*.
-4. **Capa de caché**: un diccionario en memoria guarda respuestas repetidas para optimizar el uso de la API y los tiempos de respuesta.
-5. **Escalamiento a humano**: si la pregunta no puede responderse con el contexto disponible, se notifica a un asesor humano por Telegram.
+## Stack
 
-## Estructura del proyecto
+- Python 3.10+
+- Flask para la interfaz web
+- python-telegram-bot para Telegram
+- LangChain y FAISS para RAG
+- Google Gemini para LLM y embeddings
+- Markdown y documentos locales en documents/
 
-```
+## Estructura
+
+```text
 .
-├── main.py                      # Punto de entrada (inicia el bot)
-├── requirements.txt             # Dependencias de Python
-├── .env.example                 # Plantilla de variables de entorno
-├── .gitignore                   # Archivos excluidos de control de versiones
-├── documents/                   # Base de conocimiento
+├── main.py
+├── requirements.txt
+├── .env.example
+├── .env
+├── README.md
+├── documents/
 │   └── base_conocimiento.md
-└── src/
-    ├── __init__.py              # Marca `src/` como paquete Python
-    ├── config.py                # Carga y valida variables de entorno
-    ├── bot.py                   # Lógica del bot de Telegram
-    └── rag_engine.py            # Pipeline RAG (documentos, vectores, LLM)
+├── src/
+│   ├── __init__.py
+│   ├── bot.py
+│   ├── config.py
+│   ├── rag_engine.py
+│   └── web_app.py
+└── templates/
+    └── index.html
 ```
 
 ## Requisitos previos
 
 - Python 3.10 o superior
-- Clave API de Google Gemini (desde [Google AI Studio](https://aistudio.google.com/))
-- Token de bot de Telegram (obtenido con [@BotFather](https://t.me/BotFather))
+- Entorno virtual recomendado
+- Token de Telegram del bot generado con @BotFather
+- Clave API de Google Gemini desde Google AI Studio
 
-## Instalación
+## Configuración
 
-1. **Clona el repositorio e instala las dependencias** (recomendado usar un entorno virtual):
+1. Crea un entorno virtual:
 
-   ```bash
-   python -m venv venv
-   source venv/bin/activate        # En Windows: venv\Scripts\activate
-   pip install -r requirements.txt
-   ```
+```bash
+python -m venv venv
+source venv/bin/activate
+```
 
-2. **Configura las variables de entorno**:
+2. Instala dependencias:
 
-   ```bash
-   cp .env.example .env
-   ```
+```bash
+pip install -r requirements.txt
+```
 
-   Edita `.env` y completa tus credenciales:
+3. Crea tu archivo de entorno:
 
-   | Variable | Descripción |
-   | :--- | :--- |
-   | `TELEGRAM_BOT_TOKEN` | Token de tu bot (de @BotFather) |
-   | `GOOGLE_API_KEY` | Clave API de Google Gemini |
-   | `HUMAN_AGENT_CHAT_ID` | ID de chat de Telegram del asesor humano |
+```bash
+cp .env.example .env
+```
 
-3. **Agrega la base de conocimiento**: coloca tus documentos en la carpeta `documents/`. Se admiten archivos **PDF**, **Markdown (`.md`)** y **texto (`.txt`)**.
+4. Completa las variables en .env:
 
-4. **Ejecuta la aplicación**:
+```env
+TELEGRAM_BOT_TOKEN=
+GOOGLE_API_KEY=
+GEMINI_MODEL=gemini-2.5-flash-lite
+GEMINI_EMBEDDING_MODEL=models/gemini-embedding-001
+HUMAN_AGENT_CHAT_ID=0
+```
 
-   ```bash
-   python main.py
-   ```
+Notas importantes:
+- No se debe hardcodear ninguna API key en el código.
+- HUMAN_AGENT_CHAT_ID debe ser el ID del chat del agente humano al que se escalarán consultas.
+- Si no defines TELEGRAM_BOT_TOKEN, la app inicia solo la web y no el bot.
 
-## Reglas de anclaje y escalamiento
+## Ejecución
 
-- Temperatura baja del LLM (`0.1`) para minimizar alucinaciones.
-- Si la respuesta no está explícita en la base de conocimiento, el bot responde con `ESCALATE_TO_HUMAN`.
-- El sistema envía automáticamente la consulta no resuelta al chat del asesor humano definido en `HUMAN_AGENT_CHAT_ID`.
+Desde la raíz del proyecto:
 
-## Notas de seguridad
+```bash
+source venv/bin/activate
+python main.py
+```
 
-- **Nunca** subas tu archivo `.env` al repositorio. Contiene credenciales sensibles.
-- El `.gitignore` ya excluye `.env`, `venv/` y `__pycache__/`.
-- Si alguna vez llegaste a publicar una clave, revócala y genera una nueva inmediatamente.
+También puedes elegir un puerto explícito:
+
+```bash
+PORT=5010 python main.py
+```
+
+La app detecta un puerto libre si el valor preferido está ocupado y evita fallar por conflicto de puertos.
+
+## Cómo funciona
+
+1. Carga la base de conocimiento desde documents/
+2. Busca contexto relevante por similitud
+3. Intenta responder con Gemini si la API está disponible y hay cuota
+4. Si Gemini falla por cuota, modelo no soportado o credenciales inválidas, usa el respaldo local
+5. Si la pregunta está fuera del alcance, responde con escalamiento a humano y no inventa información
+
+## Reglas de negocio para la respuesta
+
+- Solo responde con información que aparezca explícitamente en la documentación local.
+- Si la respuesta no está en los documentos, debe indicar que requiere revisión humana.
+- No genera información no respaldada por la base de conocimiento.
+- El sistema responde con tono natural y breve en español.
+
+## Seguridad
+
+- El archivo .env no debe subirse al repositorio.
+- Las claves se cargan con variables de entorno.
+- No se incluyen secretos en el código ni en los mensajes de logs.
+
+## Verificación realizada
+
+Se validó de forma real que:
+- la web responde correctamente
+- la API del bot inicia sin romper la app
+- la base local responde cuando Gemini no está disponible
+- la aplicación arranca sin fallar por puerto ocupado ni por errores no críticos de API externa
+
+## URL de acceso
+
+Tras arrancar, la interfaz queda disponible en:
+
+```text
+http://localhost:5010
+```
+
+Si el puerto 5010 está ocupado, la app intenta otro puerto libre automáticamente.
