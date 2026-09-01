@@ -51,58 +51,72 @@ It works with two layers:
 - Telegram bot token generated with @BotFather
 - Google Gemini API key from Google AI Studio
 
-## Configuration
+## Installation and Setup
 
-1. Create a virtual environment:
+### 1. Create a virtual environment:
 
 ```bash
-python -m venv venv
+python3 -m venv venv
+```
+
+### 2. Activate the virtual environment:
+
+**On Linux/Mac:**
+```bash
 source venv/bin/activate
 ```
 
-2. Install dependencies:
+**On Windows:**
+```bash
+venv\Scripts\activate
+```
+
+### 3. Install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Create the environment file:
+### 4. Set up environment variables:
+
+Copy the example file:
 
 ```bash
 cp .env.example .env
 ```
 
-4. Fill in the variables in `.env`:
+Edit `.env` and fill in your credentials:
 
 ```env
-TELEGRAM_BOT_TOKEN=
-GOOGLE_API_KEY=
+TELEGRAM_BOT_TOKEN=your_token_here
+GOOGLE_API_KEY=your_api_key_here
 GEMINI_MODEL=gemini-2.5-flash-lite
 GEMINI_EMBEDDING_MODEL=models/gemini-embedding-001
-HUMAN_AGENT_CHAT_ID=0
+HUMAN_AGENT_CHAT_ID=your_chat_id
 ```
 
-Important notes:
-- Do not hardcode any API keys in the source code.
-- `HUMAN_AGENT_CHAT_ID` must be the chat ID for the human support agent.
-- If `TELEGRAM_BOT_TOKEN` is missing, the app runs the web interface but not the Telegram bot.
+**Important notes:**
+- Never hardcode API keys in the source code, always use environment variables.
+- `HUMAN_AGENT_CHAT_ID` must be your Telegram user ID (where out-of-scope queries will be escalated).
+- If `TELEGRAM_BOT_TOKEN` is not set, the app will run only the web interface.
 
 ## Running the app
+
+**Make sure you are in the project directory and the virtual environment is activated.**
 
 From the project root:
 
 ```bash
-source venv/bin/activate
 python main.py
 ```
 
-You can also force a port explicitly:
+To specify a custom port:
 
 ```bash
-PORT=5010 python main.py
+PORT=5000 python main.py
 ```
 
-The app automatically picks a free port if the preferred one is already occupied.
+The app automatically detects and uses a free port if the preferred one is already in use.
 
 ## How it works
 
@@ -132,12 +146,20 @@ This project was validated in real execution to confirm that:
 - the local fallback works when Gemini is unavailable
 - the application does not crash on API quota or model compatibility errors
 
-## Access URL
+## Accessing the application
 
-After startup, the interface is available at:
+After running `python main.py`, the web interface will be available at:
 
 ```text
-http://localhost:5010
+http://localhost:5002
 ```
 
-If port 5010 is busy, the app will attempt another free port automatically.
+(If port 5002 is busy, the app will automatically choose another free port and display it in the console)
+
+You can also access it from another machine using your server's IP:
+
+```text
+http://<your_ip>:5002
+```
+
+**For Telegram:** The bot will be active automatically if you configured `TELEGRAM_BOT_TOKEN`.

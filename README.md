@@ -50,58 +50,72 @@ La app funciona con dos capas:
 - Token de Telegram del bot generado con @BotFather
 - Clave API de Google Gemini desde Google AI Studio
 
-## Configuración
+## Instalación y configuración
 
-1. Crea un entorno virtual:
+### 1. Crea un entorno virtual:
 
 ```bash
-python -m venv venv
+python3 -m venv venv
+```
+
+### 2. Activa el entorno virtual:
+
+**En Linux/Mac:**
+```bash
 source venv/bin/activate
 ```
 
-2. Instala dependencias:
+**En Windows:**
+```bash
+venv\Scripts\activate
+```
+
+### 3. Instala las dependencias:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Crea tu archivo de entorno:
+### 4. Configura las variables de entorno:
+
+Copia el archivo de ejemplo:
 
 ```bash
 cp .env.example .env
 ```
 
-4. Completa las variables en .env:
+Edita `.env` y completa las variables:
 
 ```env
-TELEGRAM_BOT_TOKEN=
-GOOGLE_API_KEY=
+TELEGRAM_BOT_TOKEN=tu_token_aqui
+GOOGLE_API_KEY=tu_clave_api_aqui
 GEMINI_MODEL=gemini-2.5-flash-lite
 GEMINI_EMBEDDING_MODEL=models/gemini-embedding-001
-HUMAN_AGENT_CHAT_ID=0
+HUMAN_AGENT_CHAT_ID=tu_id_chat
 ```
 
-Notas importantes:
-- No se debe hardcodear ninguna API key en el código.
-- HUMAN_AGENT_CHAT_ID debe ser el ID del chat del agente humano al que se escalarán consultas.
-- Si no defines TELEGRAM_BOT_TOKEN, la app inicia solo la web y no el bot.
+**Notas importantes:**
+- No hardcodees ninguna API key en el código, siempre usa variables de entorno.
+- `HUMAN_AGENT_CHAT_ID` debe ser tu ID de usuario en Telegram (donde se escalarán las consultas fuera de scope).
+- Si no defines `TELEGRAM_BOT_TOKEN`, la app inicia solo la interfaz web.
 
 ## Ejecución
 
-Desde la raíz del proyecto:
+**Asegúrate de estar en el directorio del proyecto y con el entorno virtual activado.**
+
+Desde la raíz:
 
 ```bash
-source venv/bin/activate
 python main.py
 ```
 
-También puedes elegir un puerto explícito:
+Para elegir un puerto específico:
 
 ```bash
-PORT=5010 python main.py
+PORT=5000 python main.py
 ```
 
-La app detecta un puerto libre si el valor preferido está ocupado y evita fallar por conflicto de puertos.
+La app detecta automáticamente un puerto libre si el preferido está ocupado.
 
 ## Cómo funciona
 
@@ -132,12 +146,20 @@ Se validó de forma real que:
 - la base local responde cuando Gemini no está disponible
 - la aplicación arranca sin fallar por puerto ocupado ni por errores no críticos de API externa
 
-## URL de acceso
+## Acceso a la aplicación
 
-Tras arrancar, la interfaz queda disponible en:
+Tras ejecutar `python main.py`, la interfaz queda disponible en:
 
 ```text
-http://localhost:5010
+http://localhost:5002
 ```
 
-Si el puerto 5010 está ocupado, la app intenta otro puerto libre automáticamente.
+(Si el puerto 5002 está ocupado, la app automáticamente elige otro puerto libre y lo muestra en la consola)
+
+También puedes acceder desde tu máquina usando la IP de red:
+
+```text
+http://<tu_ip>:5002
+```
+
+**Para Telegram:** El bot estará activo automáticamente si configuraste `TELEGRAM_BOT_TOKEN`.

@@ -15,11 +15,16 @@ except ImportError:  # pragma: no cover
     GoogleGenerativeAIEmbeddings = None
 
 SEARCH_ALIASES = {
-    "requisito": ["requisito", "prerrequisito", "preparacion", "preparación", "antes de empezar", "necesita", "necesitas"],
-    "precio": ["precio", "cost", "costo", "cuanto", "cuánto", "pago", "descuento", "tarifa", "valor", "cuesta", "cuestan", "precio del curso"],
-    "reembolso": ["reembolso", "devolucion", "devolución", "cancelacion", "cancelación", "refund", "satisfecho", "quedo satisfecho", "devolucion del 100%"],
-    "inscripcion": ["inscrib", "matricula", "matrícula", "registro", "inicio", "fecha", "clases", "cuotas", "financiamiento", "plazo"],
-    "horario": ["horario", "atencion", "atención", "soporte", "cuando abren", "cuando esta abierto"],
+    "requisito": ["requisito", "prerrequisito", "preparacion", "preparación", "antes de empezar", "necesita", "necesitas", "se requiere", "se necesita", "requisitos previos", "pre-requisito", "conocimientos previos"],
+    "precio": ["precio", "cost", "costo", "cuanto", "cuánto", "pago", "descuento", "tarifa", "valor", "cuesta", "cuestan", "precio del curso", "cuanto cuesta", "cual es el precio", "valores", "inversión", "quanto", "arancel"],
+    "reembolso": ["reembolso", "devolucion", "devolución", "cancelacion", "cancelación", "refund", "satisfecho", "quedo satisfecho", "devolucion del 100%", "política de reembolso", "garantía", "dinero de vuelta", "recuperar dinero", "no quedo satisfecho"],
+    "inscripcion": ["inscrib", "matricula", "matrícula", "registro", "inicio", "fecha", "clases", "cuotas", "financiamiento", "plazo", "proceso de inscripcion", "como me inscribo", "como inscribirse", "cómo registrarse", "enrolar", "cohort", "cohorte", "admisiones"],
+    "horario": ["horario", "atencion", "atención", "soporte", "cuando abren", "cuando esta abierto", "horas de atencion", "horas de atención", "disponibilidad", "abierto", "cierre", "horarios administrativos"],
+    "modalidad": ["modalidad", "online", "presencial", "en vivo", "asincrónico", "sincrónico", "zoom", "lms", "plataforma", "formato del curso"],
+    "duracion": ["duracion", "duración", "semanas", "horas", "tiempo", "cuanto dura", "cuando termina", "cuándo termina"],
+    "profesor": ["profesor", "instructor", "docente", "mentor", "quien enseña", "quién enseña", "facilitador", "tutor", "equipo docente"],
+    "contenido": ["contenido", "temario", "módulo", "tema", "qué aprendo", "qué se enseña", "programa", "syllabus", "plan de estudio"],
+    "certificado": ["certificado", "diploma", "constancia", "acreditación", "titulación", "credenciales"],
 }
 
 SYSTEM_PROMPT = """You are "Sora", the AI support assistant for the Academia de Tecnología e IA.
@@ -93,7 +98,7 @@ class RAGEngine:
             return
 
         try:
-            text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+            text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
             chunks = text_splitter.split_documents(self.raw_documents)
 
             for model_name in GEMINI_EMBEDDING_MODELS:
@@ -127,21 +132,52 @@ class RAGEngine:
         for document in self.raw_documents:
             text = self._normalize(document.page_content)
             score = 0
+            
+            # Puntuación por tokens exactos
             for token in q_tokens:
                 if token in text:
                     score += 2
+            
+            # Puntuación por aliases de categoría
             for category, aliases in SEARCH_ALIASES.items():
-                if any(alias in normalized_question for alias in aliases):
-                    if category in ["requisito", "precio", "reembolso", "inscripcion", "horario"]:
-                        if any(alias in text for alias in aliases):
-                            score += 6
-            if "curso" in normalized_question and ("telegram" in text or "python" in text or "prompt" in text):
-                score += 4
+                # Si la pregunta contiene un alias de categoría
+                matching_aliases_q = [alias for alias in aliases if alias in normalized_question]
+                if matching_aliases_q:
+                    # Si el documento también contiene esos aliases
+                    matching_aliases_doc = [alias for alias in aliases if alias in text]
+                    if matching_aliases_doc:
+                        score += len(matching_aliases_q) * len(matching_aliases_doc) * 3
+            
+            # Puntuación por palabras clave relacionadas
+            keywords = {
+                "curso": 2,
+                "modulo": 2,
+                "temario": 2,
+                "requisito": 2,
+                "precio": 2,
+                "duracion": 1,
+                "modalidad": 1,
+                "semanas": 1,
+                "horas": 1,
+            }
+            
+            for keyword, weight in keywords.items():
+                if keyword in normalized_question and keyword in text:
+                    score += weight
+            
+            # Puntuación por contexto de secciones (si el doc contiene encabezados relevantes)
+            if "#" in document.page_content and any(token in normalized_question for token in ["que es", "que aprendo", "contenido"]):
+                score += 3
+            
+            # Puntuación por longitud del documento (docs más largos = más contexto)
+            if len(document.page_content) > 500 and score > 0:
+                score += 1
+            
             if score:
                 scored.append((score, document))
 
         scored.sort(key=lambda item: item[0], reverse=True)
-        return [doc for _, doc in scored[:3]]
+        return [doc for _, doc in scored[:5]]
 
     def _best_matching_lines(self, question: str, lines):
         normalized_question = self._normalize(question)
@@ -150,22 +186,49 @@ class RAGEngine:
 
         for line in lines:
             stripped = line.strip()
-            if not stripped:
+            if not stripped or len(stripped) < 10:
                 continue
             normalized_line = self._normalize(stripped)
             score = 0
+            
+            # Puntuación por tokens coincidentes
             for token in tokens:
                 if token in normalized_line:
-                    score += 3
-            if any(keyword in normalized_line for keyword in ["curso", "bot", "telegram", "precio", "requisito", "reembolso", "inscripcion", "horario", "soporte", "admisiones"]):
+                    score += 4
+            
+            # Puntuación por palabras clave específicas
+            key_phrases = {
+                "curso": 2,
+                "prerequisito": 3,
+                "precio": 2,
+                "duracion": 2,
+                "modalidad": 2,
+                "semana": 1,
+                "hora": 1,
+                "modulo": 2,
+                "temario": 2,
+                "objetivo": 2,
+                "perfil de egreso": 3,
+                "contenido": 2,
+            }
+            
+            for phrase, weight in key_phrases.items():
+                if phrase in normalized_line:
+                    score += weight
+            
+            # Penalizar líneas muy cortas o muy genéricas
+            if len(stripped) < 20:
+                score *= 0.5
+            
+            # Bonificación si contiene números (precios, duraciones)
+            if any(char.isdigit() for char in stripped):
                 score += 2
-            if any(keyword in normalized_line for keyword in ["bots con telegram", "python para ciencia", "prompt engineering", "reembolso", "prerrequisitos", "horarios de atencion", "ventas", "admisiones"]):
-                score += 4
+            
             if score > 0:
                 scored.append((score, stripped))
 
         scored.sort(key=lambda item: item[0], reverse=True)
-        return [line for _, line in scored[:4]]
+        return [line for _, line in scored[:6]]
 
     def _offline_response(self, question: str, docs):
         if not docs and not self.raw_documents:
@@ -180,7 +243,8 @@ class RAGEngine:
         lowered = text.lower()
         q_lower = question.lower()
 
-        if any(token in q for token in ["cuanto", "precio", "costo", "descuento", "tarifa", "valor", "cuesta"]):
+        # Búsqueda de precios
+        if any(token in q for token in ["cuanto", "precio", "costo", "descuento", "tarifa", "valor", "cuesta", "arancel", "inversion", "quanto"]):
             prices = re.findall(r"\$\s*\d+(?:\.\d+)?\s*USD", text, flags=re.IGNORECASE)
             if prices:
                 unique_prices = []
@@ -191,39 +255,75 @@ class RAGEngine:
                         unique_prices.append(clean)
                         seen.add(clean)
                 if unique_prices:
-                    return {"action": "reply", "message": "Según la base de conocimiento: " + "; ".join(unique_prices[:10]) + ".", "mode": "offline"}
+                    # Extraer contexto (nombre del curso)
+                    course_names = ["Bots con Telegram", "Python para Ciencia", "Prompt Engineering"]
+                    prices_with_context = []
+                    for price in unique_prices[:5]:
+                        for course in course_names:
+                            if course.lower() in lowered:
+                                prices_with_context.append(f"{course}: {price}")
+                    
+                    if prices_with_context:
+                        return {"action": "reply", "message": "Según la base de conocimiento: " + "; ".join(prices_with_context) + ".", "mode": "offline"}
+                    else:
+                        return {"action": "reply", "message": "Según la base de conocimiento: " + "; ".join(unique_prices[:10]) + ".", "mode": "offline"}
 
-        if any(token in q for token in ["requisito", "prerrequisito", "necesita", "necesitas", "antes de empezar"]):
+        # Búsqueda de requisitos/prerequisitos
+        if any(token in q for token in ["requisito", "prerrequisito", "necesita", "necesitas", "antes de empezar", "se requiere", "se necesita"]):
             for line in text.splitlines():
-                if "prerrequisitos" in line.lower() or "requisitos" in line.lower():
-                    return {"action": "reply", "message": line.strip(), "mode": "offline"}
+                if "prerrequisitos" in line.lower() or "requisitos" in line.lower() or "pre-requisito" in line.lower():
+                    if len(line.strip()) > 15:
+                        return {"action": "reply", "message": line.strip(), "mode": "offline"}
 
-        if any(token in q for token in ["reembolso", "devolucion", "cancelacion", "satisfecho", "refund"]):
+        # Búsqueda de reembolso
+        if any(token in q for token in ["reembolso", "devolucion", "cancelacion", "satisfecho", "refund", "dinero de vuelta", "recuperar dinero"]):
             if "garantia de reembolso" in lowered or "devolucion del 100%" in lowered or "si no quedas satisfecho" in lowered:
                 return {
                     "action": "reply",
-                    "message": "La política indica que puedes solicitar la devolución del 100% de tu dinero dentro de los primeros 7 días naturales tras el inicio del curso si no quedas satisfecho.",
+                    "message": "La política de garantía indica que puedes solicitar la devolución del 100% de tu dinero dentro de los primeros 7 días naturales tras el inicio del curso si no quedas satisfecho.",
                     "mode": "offline",
                 }
 
-        if any(token in q for token in ["inscrib", "matricula", "registro", "inicio", "fecha", "cohorte", "plazo"]):
-            if "flujo del proceso de inscripcion" in lowered or "solicitud" in lowered or "seleccion" in lowered:
+        # Búsqueda de inscripción
+        if any(token in q for token in ["inscrib", "matricula", "registro", "inicio", "fecha", "cohorte", "plazo", "como me inscribo", "enrolar"]):
+            if "flujo del proceso de inscripcion" in lowered or "solicitud" in lowered or "seleccion" in lowered or "admisiones" in lowered:
                 return {
                     "action": "reply",
-                    "message": "El proceso de inscripción es: completar la solicitud, elegir cohorte y horario, pagar o adjuntar comprobante, confirmar la validación y recibir acceso al LMS.",
+                    "message": "El proceso de inscripción es: 1) Completar la solicitud, 2) Elegir cohorte y horario, 3) Realizar pago o adjuntar comprobante, 4) Confirmar validación, 5) Recibir acceso al LMS.",
                     "mode": "offline",
                 }
 
-        if any(token in q for token in ["horario", "atencion", "atención", "soporte", "abierto"]):
+        # Búsqueda de horarios
+        if any(token in q for token in ["horario", "atencion", "atención", "soporte", "abierto", "horas", "cuando abren", "disponibilidad"]):
             for line in text.splitlines():
-                if "horarios de atencion" in line.lower() or "horarios de atención" in line.lower() or "atencion administrativa" in line.lower() or "atención administrativa" in line.lower():
-                    return {"action": "reply", "message": line.strip(), "mode": "offline"}
+                if any(h in line.lower() for h in ["horarios de atencion", "horarios de atención", "atencion administrativa", "atención administrativa", "horario"]):
+                    if len(line.strip()) > 15:
+                        return {"action": "reply", "message": line.strip(), "mode": "offline"}
 
+        # Búsqueda de contenido/temario
+        if any(token in q for token in ["contenido", "que aprendo", "temario", "modulo", "syllabus", "plan de estudio", "qué se enseña"]):
+            matching_lines = self._best_matching_lines(question, text.splitlines())
+            if matching_lines and any("módulo" in line.lower() or "temario" in line.lower() for line in matching_lines):
+                combined = " ".join(matching_lines[:3])
+                if len(combined) > 40:
+                    return {"action": "reply", "message": combined, "mode": "offline"}
+
+        # Búsqueda de modalidad
+        if any(token in q for token in ["modalidad", "online", "presencial", "en vivo", "sincrónico", "asincrónico", "zoom", "lms"]):
+            for line in text.splitlines():
+                if any(m in line.lower() for m in ["modalidad", "online", "sincrónico", "asincrónico", "zoom", "lms"]):
+                    if len(line.strip()) > 15:
+                        return {"action": "reply", "message": line.strip(), "mode": "offline"}
+
+        # Búsqueda por líneas coincidentes como último recurso
         best_lines = self._best_matching_lines(question, text.splitlines())
         if best_lines:
-            combined = " ".join(best_lines[:2])
-            if len(combined) > 30:
-                return {"action": "reply", "message": combined, "mode": "offline"}
+            # Filtrar líneas muy cortas
+            best_lines = [line for line in best_lines if len(line) > 25]
+            if best_lines:
+                combined = " ".join(best_lines[:3])
+                if len(combined) > 40:
+                    return {"action": "reply", "message": combined, "mode": "offline"}
 
         return {
             "action": "escalate",
