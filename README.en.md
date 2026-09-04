@@ -4,7 +4,7 @@
 
 Two layers alternate automatically:
 1. **Smart layer (Gemini)**: when `GOOGLE_API_KEY` is valid and quota remains, uses `gemini-embedding-001` embeddings + LLM `gemini-2.5-flash-lite` / `gemini-3.6-flash` with context.
-2. **Local layer (offline)**: on any API failure, searches `documents/base_conocimiento.md` with token + alias matching and answers without hallucinating. With no evidence, it escalates to a human.
+2. **Local layer (offline)**: on any API failure, searches `docs/knowledge/base_conocimiento.md` with token + alias matching and answers without hallucinating. With no evidence, it escalates to a human.
 
 ---
 
@@ -72,28 +72,47 @@ All compatible with Python 3.12 and verified with `pip check`.
 
 ---
 
-## Project structure
+## Project structure (junior-friendly — clearly separated)
+
+> **Goal:** a junior finds in 5 seconds where everything is: `backend` = server, `frontend` = visuals, `docs` = papers.
 
 ```text
 .
-├── main.py                     # web + bot launcher (finds a free port)
-├── requirements.txt
-├── .env.example                # env template
-├── .env                        # your keys (not versioned, see .gitignore)
-├── README.md / README.en.md
-├── DOCUMENTACION_PROYECTO.md
-├── documents/
-│   └── base_conocimiento.md    # SINGLE source of truth (9 sections, 25.5k)
-├── src/
-│   ├── config.py               # loads .env + validates types
-│   ├── rag_engine.py           # RAG: FAISS + Gemini + offline fallback + circuit-breaker
-│   ├── web_app.py              # Flask: /, /api/info, /api/status, /api/chat
-│   └── bot.py                  # Telegram: /start + handle_message + escalation
-└── templates/
-    └── index.html              # web chat + info bar (fetch to /api/*)
+├── main.py                     # ← entry point (from root: python main.py)
+├── requirements.txt            # deps (Flask, telegram-bot, langchain, faiss...)
+├── .env.example / .env         # template and your keys (not versioned)
+├── README.md / README.en.md    # user guide (you are here)
+│
+├── backend/                    # 🔧 BACKEND — all Python server
+│   ├── config.py               # reads .env → TELEGRAM_BOT_TOKEN, GOOGLE_API_KEY...
+│   ├── rag_engine.py           # RAG core 618 lines: FAISS + Gemini + offline + circuit-breaker
+│   ├── web_app.py              # Flask 90 lines: /, /api/info, /api/status, /api/chat
+│   ├── bot.py                  # Telegram 67 lines: /start + handle_message + escalation
+│   └── __init__.py
+│
+├── frontend/                   # 🎨 FRONTEND — all visuals
+│   ├── templates/
+│   │   └── index.html          # HTML with Jinja2 (uses url_for to static)
+│   └── static/
+│       ├── css/
+│       │   └── style.css       # 20KB — light/dark vars, sidebar, chat, responsive
+│       └── js/
+│           └── app.js          # 9KB — fetch /api/*, theme, font, sidebar, chat
+│
+└── docs/                       # 📚 DOCS — all written
+    ├── README.md               # docs index
+    ├── DOCUMENTACION_PROYECTO.md      # tech doc ES (516 lines, 20 sections)
+    ├── DOCUMENTACION_PROYECTO_EN.md   # tech doc EN (515 lines)
+    └── knowledge/
+        └── base_conocimiento.md       # SINGLE source of truth (256 lines, 9 sections)
 ```
 
-`documents/base_conocimiento.md` holds **all** official information (courses, pricing, enrollment, policies, support, labs, mentoring, R&D).
+**Before vs now (so you see the change):**
+- `src/` → `backend/` (clearer: backend = server)
+- `templates/` → `frontend/templates/` + `frontend/static/` (separate CSS/JS)
+- `documents/` → `docs/knowledge/` + `docs/DOCUMENTACION_*` (all writing together)
+
+`docs/knowledge/base_conocimiento.md` holds **all** official information (courses, pricing, enrollment, policies, support, labs, mentoring, R&D) and is what the backend reads (`backend/rag_engine.py:87` and `backend/web_app.py:24` with fallback to `documents/` legacy).
 
 ---
 
@@ -121,7 +140,7 @@ cp .env.example .env
 1. Open Telegram → search `@BotFather` → `/newbot`.
 2. Follow the wizard, pick name and username → copy token `123456:AAH...`.
 3. Paste into `.env` as `TELEGRAM_BOT_TOKEN=123456:AAH...`.
-4. *Optional:* if you skip this, the app runs web-only (see `src/bot.py:44`).
+4. *Optional:* if you skip this, the app runs web-only (see `backend/bot.py:44`).
 
 #### 3.2 Google Gemini — `GOOGLE_API_KEY` + models
 1. Go to https://aistudio.google.com/app/apikey → **Create API key**.
@@ -131,12 +150,12 @@ cp .env.example .env
    GEMINI_MODEL=gemini-2.5-flash-lite
    GEMINI_EMBEDDING_MODEL=models/gemini-embedding-001
    ```
-   The code automatically falls back to `gemini-flash-latest`, `gemini-3.6-flash`, `gemini-3.5-flash` if the primary fails or is out of quota (`src/rag_engine.py:70`).
+   The code automatically falls back to `gemini-flash-latest`, `gemini-3.6-flash`, `gemini-3.5-flash` if the primary fails or is out of quota (`backend/rag_engine.py:70`).
 
 #### 3.3 Human for escalations — `HUMAN_AGENT_CHAT_ID`
 1. On Telegram search `@userinfobot` → `/start` → copy your numeric ID.
 2. In `.env` set `HUMAN_AGENT_CHAT_ID=123456789`.
-3. When someone asks out-of-scope, the bot sends `⚠️ Escalamiento Requerido` to that chat (`src/bot.py:33`).
+3. When someone asks out-of-scope, the bot sends `⚠️ Escalamiento Requerido` to that chat (`backend/bot.py:33`).
 
 ### 4. Final `.env` example
 
@@ -158,13 +177,13 @@ PORT=5002
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `TELEGRAM_BOT_TOKEN` | No | `""` | Token from @BotFather. If empty, bot does not start but web does (`main.py:40`). |
-| `GOOGLE_API_KEY` | No | `""` | Gemini key. If missing, FAISS is not initialized and everything goes offline (`src/rag_engine.py:85`). |
+| `GOOGLE_API_KEY` | No | `""` | Gemini key. If missing, FAISS is not initialized and everything goes offline (`backend/rag_engine.py:85`). |
 | `GEMINI_MODEL` | No | `gemini-2.5-flash-lite` | Chat model. Fallback list in `GEMINI_CHAT_MODELS`. |
 | `GEMINI_EMBEDDING_MODEL` | No | `models/gemini-embedding-001` | Embedding model. Fallback `models/gemini-embedding-2`. |
 | `HUMAN_AGENT_CHAT_ID` | No | `0` | Numeric advisor ID. Use `@userinfobot`. |
 | `PORT` | No | `5002` | Preferred port. `get_available_port()` (`main.py:11`) probes up to 65535. |
 
-Never hardcode keys: they are loaded via `python-dotenv` in `src/config.py:4`.
+Never hardcode keys: they are loaded via `python-dotenv` in `backend/config.py:4`.
 
 ---
 
@@ -227,7 +246,7 @@ Try these in web or Telegram:
 | `Hello` / `Hola` | Sora greeting (does not escalate) | Offline |
 | `Who is the president of France?` | `Sorry, out of scope... human advisor` + Telegram escalation | Offline `escalate` |
 
-All offline answers were validated with `src/rag_engine.py:_offline_response`.
+All offline answers were validated with `backend/rag_engine.py:_offline_response`.
 
 ---
 
@@ -237,8 +256,8 @@ All offline answers were validated with `src/rag_engine.py:_offline_response`.
 User (Web/Telegram)
         ↓
   ┌─────────────┐
-  │  RAGEngine  │  src/rag_engine.py:84
-  │  1. Load documents/*.md|pdf → TextLoader/PyPDFLoader
+  │  RAGEngine  │  backend/rag_engine.py:84
+  │  1. Load docs/knowledge/*.md|pdf → TextLoader/PyPDFLoader
   │  2. Splitter 800/100 → RecursiveCharacterTextSplitter
   │  3. FAISS.from_documents(GoogleGenerativeAIEmbeddings)
   └─────────────┘
@@ -262,13 +281,13 @@ User (Web/Telegram)
   Web (/api/chat) or Telegram (reply + human notification)
 ```
 
-**Web flow (`src/web_app.py`):**
+**Web flow (`backend/web_app.py`):**
 - `GET /` → `render_template("index.html")`
 - `GET /api/info` → parses `base_conocimiento.md` with regex and returns 5 pills (Courses, Price, Support, Admissions, Hours)
 - `GET /api/status` → `{status:ok, telegram_enabled: bool(TELEGRAM_BOT_TOKEN), rag_ready, vector_store_ready}`
 - `POST /api/chat {message}` → `rag.query()` → `{answer, action, mode}`
 
-**Telegram flow (`src/bot.py`):**
+**Telegram flow (`backend/bot.py`):**
 - `CommandHandler("start")` → greeting
 - `MessageHandler(TEXT)` → `rag.query()` → `reply_text` → if `escalate` and `HUMAN_AGENT_CHAT_ID` → `send_message` to human.
 
@@ -277,7 +296,7 @@ User (Web/Telegram)
 ## Backend API
 
 ### `GET /`
-HTML chat. `templates/index.html` does `fetch('/api/info')` and `fetch('/api/chat')`.
+HTML chat. `frontend/templates/index.html` does `fetch('/api/info')` and `fetch('/api/chat')`.
 
 ### `GET /api/info`
 ```bash
@@ -329,11 +348,11 @@ curl -X POST http://localhost:5002/api/chat -H "Content-Type: application/json" 
 
 ## RAG engine in detail
 
-**File:** `src/rag_engine.py` (540 lines) — system core.
+**File:** `backend/rag_engine.py` (540 lines) — system core.
 
 | Stage | Detail | Code |
 |-------|--------|------|
-| **Load** | Reads `documents/` sorted; `.pdf` via `PyPDFLoader`, `.md/.txt` via `TextLoader(utf-8)` | `:_load_documents:94` |
+| **Load** | Reads `docs/knowledge/` sorted; `.pdf` via `PyPDFLoader`, `.md/.txt` via `TextLoader(utf-8)` | `:_load_documents:94` |
 | **Split** | `RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)` | `:_init_vector_store:114` |
 | **Embeddings** | `GoogleGenerativeAIEmbeddings` with fallback `gemini-embedding-001` → `gemini-embedding-2` | `:77` |
 | **Vector store** | `FAISS.from_documents(chunks, embeddings)` | `:121` |
@@ -361,8 +380,8 @@ curl -X POST http://localhost:5002/api/chat -H "Content-Type: application/json" 
 ## Security
 
 - `.env` is in `.gitignore:7` and **never** committed. `.env.example` is the template.
-- Variables are read only via `src/config.py:4` (`load_dotenv`).
-- No secrets in code, logs or `documents/`; logs never print tokens.
+- Variables are read only via `backend/config.py:4` (`load_dotenv`).
+- No secrets in code, logs or `docs/knowledge/`; logs never print tokens.
 - To rotate keys, edit `.env` and restart `python main.py`.
 
 ---
@@ -373,14 +392,14 @@ Commands already executed in this deliverable (Python 3.12.3, `pip check` clean)
 
 ```bash
 # Compile
-python -m py_compile src/*.py main.py  # OK
+python -m py_compile backend/*.py main.py  # OK
 
 # Offline RAG (no Gemini)
-python -c "from src.rag_engine import RAGEngine; r=RAGEngine.__new__(RAGEngine); r.doc_dir='documents'; r.cache={}; r.vector_store=None; r._load_documents(); print(r._offline_response('cuanto cuesta', r._offline_search('cuanto cuesta')))"
+python -c "from backend.rag_engine import RAGEngine; r=RAGEngine.__new__(RAGEngine); r.doc_dir='docs/knowledge'; r.cache={}; r.vector_store=None; r._load_documents(); print(r._offline_response('cuanto cuesta', r._offline_search('cuanto cuesta')))"
 # → Según la base de conocimiento, los precios son: Bots ... $150 USD; Python ... $280 USD; Prompt ... $160 USD.
 
 # Web API
-python -c "from src.web_app import create_app; c=create_app().test_client(); print(c.get('/api/status').json); print(c.post('/api/chat', json={'message':'hola'}).json)"
+python -c "from backend.web_app import create_app; c=create_app().test_client(); print(c.get('/api/status').json); print(c.post('/api/chat', json={'message':'hola'}).json)"
 # → status ok, telegram_enabled true, hola → reply
 
 # Info and hours
@@ -407,10 +426,10 @@ curl -X POST http://localhost:5002/api/chat -H "Content-Type: application/json" 
 | Problem | Cause | Fix |
 |---------|-------|-----|
 | `Telegram disabled` | Empty `TELEGRAM_BOT_TOKEN` | Put your @BotFather token in `.env` and restart. Web is unaffected. |
-| `429 Quota exceeded` (Gemini) | Free-tier limit (20 req/day for `2.5-flash-lite`, 100 embeds/min) | Normal: code falls back offline immediately and enables 60s circuit-breaker (`src/rag_engine.py:87`). Wait or switch to paid API. See https://ai.google.dev/gemini-api/docs/rate-limits |
+| `429 Quota exceeded` (Gemini) | Free-tier limit (20 req/day for `2.5-flash-lite`, 100 embeds/min) | Normal: code falls back offline immediately and enables 60s circuit-breaker (`backend/rag_engine.py:87`). Wait or switch to paid API. See https://ai.google.dev/gemini-api/docs/rate-limits |
 | `404 model not found` | Old model (`1.5-flash`, `text-embedding-004`) | Already fixed to `gemini-3.6-flash` / `gemini-embedding-2`. Update `GEMINI_MODEL` if you use another. |
 | `No free port found` | All ports 5000-65535 busy | Free it: `lsof -i :5002` + `kill <PID>` or use `PORT=5010 python main.py`. |
-| `No valid documents` | `documents/` empty or wrong path | Verify `documents/base_conocimiento.md` exists (256 lines). `main.py:34` warns. |
+| `No valid documents` | `docs/knowledge/` empty or wrong path | Verify `docs/knowledge/base_conocimiento.md` exists (256 lines). `main.py:35` warns. |
 | Blank web / `template not found` | Ran from another folder | Use `python main.py` from project root; `web_app.py:11` now uses absolute path. |
 | `faiss` fails on Mac M1 | Missing `libomp` | `brew install libomp` then `pip install faiss-cpu`. |
 | Messages not reaching human | Wrong `HUMAN_AGENT_CHAT_ID` | Use `@userinfobot` on Telegram, forward a message to the bot and copy the `Id`. |

@@ -3,14 +3,16 @@ import re
 
 from flask import Flask, jsonify, request, render_template
 
-from src.config import TELEGRAM_BOT_TOKEN
-from src.rag_engine import RAGEngine
+from backend.config import TELEGRAM_BOT_TOKEN
+from backend.rag_engine import RAGEngine
 
 
 def create_app(rag_engine: RAGEngine | None = None):
-    template_dir = os.path.join(os.path.dirname(__file__), "..", "templates")
-    template_dir = os.path.abspath(template_dir)
-    app = Flask(__name__, template_folder=template_dir)
+    # Frontend está en frontend/templates, backend en backend/
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    template_dir = os.path.join(base_dir, "frontend", "templates")
+    static_dir = os.path.join(base_dir, "frontend", "static")
+    app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
     app.config["JSON_SORT_KEYS"] = False
 
     rag = rag_engine or RAGEngine()
@@ -21,7 +23,14 @@ def create_app(rag_engine: RAGEngine | None = None):
 
     @app.route("/api/info")
     def info():
-        md_path = os.path.join(os.path.dirname(__file__), "..", "documents", "base_conocimiento.md")
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        # Soporta nueva ruta docs/knowledge y legacy documents/
+        candidates = [
+            os.path.join(base_dir, "docs", "knowledge", "base_conocimiento.md"),
+            os.path.join(base_dir, "documents", "base_conocimiento.md"),
+            os.path.join(os.path.dirname(__file__), "..", "documents", "base_conocimiento.md"),
+        ]
+        md_path = next((p for p in candidates if os.path.exists(p)), candidates[0])
         items = []
 
         try:

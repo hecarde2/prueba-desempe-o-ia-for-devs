@@ -8,7 +8,7 @@ from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_community.vectorstores import FAISS
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from src.config import GOOGLE_API_KEY, GEMINI_MODEL, GEMINI_EMBEDDING_MODEL
+from backend.config import GOOGLE_API_KEY, GEMINI_MODEL, GEMINI_EMBEDDING_MODEL
 
 try:
     from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
@@ -84,7 +84,17 @@ GEMINI_EMBEDDING_MODELS = [
 
 
 class RAGEngine:
-    def __init__(self, doc_dir: str = "documents"):
+    def __init__(self, doc_dir: str | None = None):
+        # Junior: organización clara — prioriza docs/knowledge (nuevo) con fallback a documents/ (legacy)
+        if doc_dir is None:
+            base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            candidates = [
+                os.path.join(base, "docs", "knowledge"),
+                os.path.join(base, "documents"),
+                "docs/knowledge",
+                "documents",
+            ]
+            doc_dir = next((p for p in candidates if os.path.exists(p)), "docs/knowledge")
         self.doc_dir = doc_dir
         self.vector_store = None
         self.raw_documents = []

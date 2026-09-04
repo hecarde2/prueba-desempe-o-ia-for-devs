@@ -2,10 +2,10 @@ import os
 import socket
 from multiprocessing import Process
 
-from src.bot import TelegramRAGBot
-from src.config import TELEGRAM_BOT_TOKEN
-from src.rag_engine import RAGEngine
-from src.web_app import create_app
+from backend.bot import TelegramRAGBot
+from backend.config import TELEGRAM_BOT_TOKEN
+from backend.rag_engine import RAGEngine
+from backend.web_app import create_app
 
 
 def get_available_port(preferred_port: int, start_range: int = 5000, end_range: int = 65535) -> int:
@@ -33,7 +33,7 @@ def get_available_port(preferred_port: int, start_range: int = 5000, end_range: 
 def main():
     rag_engine = RAGEngine()
     if not rag_engine.raw_documents:
-        print("Advertencia: No se encontraron documentos en documents/. La base de conocimiento está vacía.")
+        print("Advertencia: No se encontraron documentos en docs/knowledge/. La base de conocimiento está vacía. Verifica docs/knowledge/base_conocimiento.md")
     else:
         print(f"Base de conocimiento cargada: {len(rag_engine.raw_documents)} documento(s).")
         if rag_engine.vector_store:

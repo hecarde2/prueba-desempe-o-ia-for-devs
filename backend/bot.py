@@ -2,8 +2,8 @@ import asyncio
 import logging
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
-from src.rag_engine import RAGEngine
-from src.config import TELEGRAM_BOT_TOKEN, HUMAN_AGENT_CHAT_ID
+from backend.rag_engine import RAGEngine
+from backend.config import TELEGRAM_BOT_TOKEN, HUMAN_AGENT_CHAT_ID
 
 logging.basicConfig(level=logging.INFO)
 

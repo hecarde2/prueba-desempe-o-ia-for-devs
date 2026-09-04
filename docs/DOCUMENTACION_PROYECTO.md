@@ -40,7 +40,7 @@
 
 **Solución técnica:** una sola base de código en Python que expone:
 
-- **Interfaz web** con chat en tiempo real (Flask + `templates/index.html`)
+- **Interfaz web** con chat en tiempo real (Flask + `frontend/templates/index.html`)
 - **Bot de Telegram** (`@SoporteAcademiaBot` + tu bot personal) con escalamiento a humano
 - **Motor RAG** que combina FAISS + Gemini *y* un respaldo local que garantiza disponibilidad aunque la API externa falle
 
@@ -51,7 +51,7 @@
 ## Objetivos
 
 ### Objetivos funcionales
-- Responder **solo** con información verificable de `documents/base_conocimiento.md`.
+- Responder **solo** con información verificable de `docs/knowledge/base_conocimiento.md`.
 - No inventar precios, fechas, requisitos ni políticas.
 - Escalar automáticamente a un asesor humano cuando la pregunta está fuera de scope.
 - Mantener la app operativa aunque la API externa falle (cuota, modelo deprecado, red).
@@ -100,7 +100,7 @@ faiss-cpu==1.8.0
 | `GOOGLE_API_KEY` | Gemini (online) | https://aistudio.google.com/app/apikey |
 | `HUMAN_AGENT_CHAT_ID` | Escalamiento humano | @userinfobot → tu ID numérico |
 
-Si no configuras estas tres, la app **sigue funcionando en modo web offline** (ver `main.py:40` y `src/rag_engine.py:85`).
+Si no configuras estas tres, la app **sigue funcionando en modo web offline** (ver `main.py:40` y `backend/rag_engine.py:85`).
 
 ---
 
@@ -110,15 +110,15 @@ Si no configuras estas tres, la app **sigue funcionando en modo web offline** (v
 
 ```
                   ┌─────────────────────┐
-                  │   documents/        │
+                  │ docs/knowledge/    │
                   │ base_conocimiento.md│──┐
                   └─────────────────────┘  │
                                            ▼
-Telegram ──►  src/bot.py  ──►  src/rag_engine.py  ──► FAISS + Gemini
+Telegram ──►  backend/bot.py  ──►  backend/rag_engine.py  ──► FAISS + Gemini
   /start       handle_message    query()       ▲  │  └─► Gem embeddings
   TEXT ──────────────────────────┘  │  context k=3
                                    │  └─► Chat LLM (temp 0.1)
-Web ──► src/web_app.py ────────────┘        │  429 → circuit 60s → offline
+Web ──► backend/web_app.py ────────────┘        │  429 → circuit 60s → offline
   /api/chat  ────────────────────────────────┘
   /api/info  ──► parsea MD con regex ─► pills en index.html
   /api/status ─► telegram_enabled / rag_ready
@@ -128,12 +128,12 @@ Web ──► src/web_app.py ────────────┘        │ 
 
 | Capa | Responsabilidad | Archivo | Tecnologías |
 |------|-----------------|---------|-------------|
-| **Presentación** | Chat web + barra info | `templates/index.html`, `src/web_app.py:19` | Flask, HTML/CSS/JS vanilla, fetch |
+| **Presentación** | Chat web + barra info | `frontend/templates/index.html`, `backend/web_app.py:19` | Flask, HTML/CSS/JS vanilla, fetch |
 | **Control** | Orquesta web y bot, gestiona puerto | `main.py:11` `get_available_port`, `Process(daemon=True)` | multiprocessing, socket |
-| **Dominio RAG** | Carga, indexa, busca y responde | `src/rag_engine.py:84` | FAISS, LangChain, Gemini |
-| **Integración** | Telegram polling + escalamiento | `src/bot.py:23` | python-telegram-bot |
-| **Config** | Variables y secretos | `src/config.py:4` | python-dotenv |
-| **Datos** | Fuente única de verdad | `documents/base_conocimiento.md` | Markdown |
+| **Dominio RAG** | Carga, indexa, busca y responde | `backend/rag_engine.py:84` | FAISS, LangChain, Gemini |
+| **Integración** | Telegram polling + escalamiento | `backend/bot.py:23` | python-telegram-bot |
+| **Config** | Variables y secretos | `backend/config.py:4` | python-dotenv |
+| **Datos** | Fuente única de verdad | `docs/knowledge/base_conocimiento.md` | Markdown |
 
 ### Flujo de una pregunta
 
@@ -148,40 +148,52 @@ Web ──► src/web_app.py ────────────┘        │ 
 
 ---
 
-## Estructura del proyecto
+## Estructura del proyecto (organización junior — 3 carpetas claras)
 
 ```text
 .
-├── main.py                     # arranque, puerto libre, bot en background
-├── requirements.txt
-├── .env.example                # plantilla
-├── .env                        # no versionado (gitignore:7)
-├── README.md / README.en.md    # guía de usuario bilingüe
-├── DOCUMENTACION_PROYECTO.md / _EN.md  # esta documentación técnica
-├── documents/
-│   └── base_conocimiento.md    # 256 líneas, 9 secciones, única fuente
-├── src/
-│   ├── __init__.py
-│   ├── config.py               # 15 líneas, load_dotenv + strip
-│   ├── rag_engine.py           # 540 líneas, núcleo RAG + fallback
-│   ├── web_app.py              # 84 líneas, Flask + 4 rutas
-│   └── bot.py                  # 60 líneas, Telegram + escalamiento
-└── templates/
-    └── index.html              # 284 líneas, chat + info-bar + JS fetch
+├── main.py                     # punto de entrada (python main.py) — orquesta backend + frontend
+├── requirements.txt            # deps: Flask, telegram-bot, langchain, faiss...
+├── .env.example / .env         # plantilla y claves (no versionado, .gitignore:7)
+├── README.md / README.en.md    # guía de usuario (inicio rápido, API, troubleshooting)
+│
+├── backend/                    # 🔧 BACKEND — Python del servidor
+│   ├── config.py               # 15 líneas — lee .env
+│   ├── rag_engine.py           # 618 líneas — FAISS + Gemini + offline + circuit-breaker
+│   ├── web_app.py              # 90 líneas — Flask: /, /api/info, /api/status, /api/chat
+│   ├── bot.py                  # 67 líneas — Telegram polling + escalamiento
+│   └── __init__.py
+│
+├── frontend/                   # 🎨 FRONTEND — interfaz visual
+│   ├── templates/
+│   │   └── index.html          # HTML con Jinja2 + url_for a static
+│   └── static/
+│       ├── css/
+│       │   └── style.css       # 20KB — variables light/dark, sidebar, chat, responsive
+│       └── js/
+│           └── app.js          # 9KB — fetch /api/*, tema, font, sidebar
+│
+└── docs/                       # 📚 DOCS — documentación y conocimiento
+    ├── README.md               # índice de docs
+    ├── DOCUMENTACION_PROYECTO.md      # esta doc ES (20 secciones)
+    ├── DOCUMENTACION_PROYECTO_EN.md   # doc EN
+    └── knowledge/
+        └── base_conocimiento.md       # única fuente de verdad (256 líneas, 9 secciones)
 ```
 
-**Cambios de la versión corregida (commit d582f42):**
-- `documents/` consolidado de 3 archivos a 1 (`base_conocimiento.md` 256 líneas).
-- `src/rag_engine.py` pasa de 387 a 540 líneas con parche de retry, circuit-breaker y 7 handlers offline.
-- `src/web_app.py` corrige `telegram_enabled` y `template_dir` absoluto.
-- `src/bot.py` añade validación y manejo de errores.
-- `main.py` añade logs y manejo de `PORT` inválido.
+**Cambios de la versión corregida:**
+- `src/` → `backend/` (backend = servidor, más claro para junior)
+- `templates/` → `frontend/templates/` + `frontend/static/css|js` (separa visual)
+- `documents/` → `docs/knowledge/` (todo lo escrito en `docs/`)
+- `DOCUMENTACION_PROYECTO.md` → `docs/` ( junto a base de conocimiento)
+- `backend/rag_engine.py` de 387 → 618 líneas con parche retry, circuit-breaker y handler de cursos
+- `backend/web_app.py` corrige `telegram_enabled` y `template_dir` absoluto a `frontend/templates`
 
 ---
 
 ## Base de conocimiento
 
-**Ubicación:** `documents/base_conocimiento.md` — Markdown UTF-8.
+**Ubicación:** `docs/knowledge/base_conocimiento.md` — Markdown UTF-8.
 
 **Contenido resumido (9 secciones, ver `grep -c "^##"` → 9):**
 
@@ -222,7 +234,7 @@ HUMAN_AGENT_CHAT_ID=0
 | `HUMAN_AGENT_CHAT_ID` | int | 0 | `int(... or 0)` | 0 desactiva escalamiento Telegram |
 | `PORT` | int | 5002 | `int(os.getenv) try/except` | Usa 5002 y busca libre |
 
-No hardcodear: todo vía `src/config.py:4` `load_dotenv()`.
+No hardcodear: todo vía `backend/config.py:4` `load_dotenv()`.
 
 ---
 
@@ -285,7 +297,7 @@ Interfaz web disponible en http://localhost:5002
 
 ## Motor RAG — pipeline completo
 
-### 1. Carga (`src/rag_engine.py:94`)
+### 1. Carga (`backend/rag_engine.py:94`)
 ```python
 for file in sorted(os.listdir(doc_dir)):
     if file.endswith(".pdf"): PyPDFLoader
@@ -355,7 +367,7 @@ if time.time() < self._quota_blocked_until: skip_gemini
 
 ## Aplicación web
 
-**`src/web_app.py` (84 líneas)**
+**`backend/web_app.py` (84 líneas)**
 
 ```python
 app = Flask(__name__, template_folder=abspath("../templates"))
@@ -368,13 +380,13 @@ app = Flask(__name__, template_folder=abspath("../templates"))
 | `/api/status` | GET | `{status:ok, telegram_enabled: bool(TELEGRAM_BOT_TOKEN), rag_ready, vector_store_ready}` | `:59` |
 | `/api/chat` | POST | Valida `message` no vacío → `rag.query()` → `{answer, action, mode}` | `:69` |
 
-**`templates/index.html` (284 líneas):** grid de pills `#infoBar`, chat con burbujas `.msg.user/.bot`, `fetch('/api/info')` con fallback, `fetch('/api/chat')` con `disabled` durante espera.
+**`frontend/templates/index.html` (284 líneas):** grid de pills `#infoBar`, chat con burbujas `.msg.user/.bot`, `fetch('/api/info')` con fallback, `fetch('/api/chat')` con `disabled` durante espera.
 
 ---
 
 ## Bot de Telegram
 
-**`src/bot.py` (60 líneas)**
+**`backend/bot.py` (60 líneas)**
 
 ```python
 app = ApplicationBuilder().token(self.token).build()
@@ -408,8 +420,8 @@ app.run_polling()
 ## Seguridad
 
 - `.env` ignorado en `.gitignore:7`, nunca commiteado. Solo `.env.example`.
-- `src/config.py:4` usa `load_dotenv()` + `strip()`.
-- Sin secretos en `src/`, `documents/` ni logs.
+- `backend/config.py:4` usa `load_dotenv()` + `strip()`.
+- Sin secretos en `backend/`, `docs/knowledge/` ni logs.
 - `requirements.txt` sin dependencias con CVEs críticos conocidos (ver `pip audit` si aplica).
 - Bot usa `parse_mode="Markdown"` solo para escalamiento, no para respuestas de usuario.
 
@@ -422,7 +434,7 @@ Entorno: `Python 3.12.3`, `pip check` sin rotos, `py_compile` OK.
 > Estos comandos fueron ejecutados realmente durante la corrección (commit d582f42).
 
 ```bash
-python -m py_compile src/*.py main.py
+python -m py_compile backend/*.py main.py
 # py_compile OK
 
 python -c "from src.rag_engine import RAGEngine; r=RAGEngine.__new__(RAGEngine); r.doc_dir='documents'; r.cache={}; r.vector_store=None; r._load_documents(); print(r._offline_response('hola', []))"

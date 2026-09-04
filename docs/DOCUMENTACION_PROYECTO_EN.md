@@ -40,7 +40,7 @@
 
 **Technical solution:** single Python codebase exposing:
 
-- **Web interface** with real-time chat (Flask + `templates/index.html`)
+- **Web interface** with real-time chat (Flask + `frontend/templates/index.html`)
 - **Telegram bot** (`@SoporteAcademiaBot` + your personal bot) with human escalation
 - **RAG engine** combining FAISS + Gemini *and* a local fallback that guarantees availability even when the external API fails
 
@@ -51,7 +51,7 @@
 ## Objectives
 
 ### Functional objectives
-- Answer **only** with verifiable information from `documents/base_conocimiento.md`.
+- Answer **only** with verifiable information from `docs/knowledge/base_conocimiento.md`.
 - Never invent prices, dates, requirements or policies.
 - Automatically escalate out-of-scope questions to a human advisor.
 - Keep the app operational even when the external API fails (quota, deprecated model, network).
@@ -100,7 +100,7 @@ faiss-cpu==1.8.0
 | `GOOGLE_API_KEY` | Gemini (online) | https://aistudio.google.com/app/apikey |
 | `HUMAN_AGENT_CHAT_ID` | Human escalation | @userinfobot → your numeric ID |
 
-Without any of them the app **still runs in web offline mode** (see `main.py:40` and `src/rag_engine.py:85`).
+Without any of them the app **still runs in web offline mode** (see `main.py:40` and `backend/rag_engine.py:85`).
 
 ---
 
@@ -110,15 +110,15 @@ Without any of them the app **still runs in web offline mode** (see `main.py:40`
 
 ```
                   ┌─────────────────────┐
-                  │   documents/        │
+                  │ docs/knowledge/    │
                   │ base_conocimiento.md│──┐
                   └─────────────────────┘  │
                                            ▼
-Telegram ──►  src/bot.py  ──►  src/rag_engine.py  ──► FAISS + Gemini
+Telegram ──►  backend/bot.py  ──►  backend/rag_engine.py  ──► FAISS + Gemini
   /start       handle_message    query()       ▲  │  └─► Gen embeddings
   TEXT ──────────────────────────┘  │  context k=3
                                    │  └─► Chat LLM (temp 0.1)
-Web ──► src/web_app.py ────────────┘        │  429 → circuit 60s → offline
+Web ──► backend/web_app.py ────────────┘        │  429 → circuit 60s → offline
   /api/chat  ────────────────────────────────┘
   /api/info  ──► parses MD with regex ─► pills in index.html
   /api/status ─► telegram_enabled / rag_ready
@@ -128,12 +128,12 @@ Web ──► src/web_app.py ────────────┘        │ 
 
 | Layer | Responsibility | File | Tech |
 |-------|----------------|------|------|
-| **Presentation** | Web chat + info bar | `templates/index.html`, `src/web_app.py:19` | Flask, vanilla HTML/CSS/JS, fetch |
+| **Presentation** | Web chat + info bar | `frontend/templates/index.html`, `backend/web_app.py:19` | Flask, vanilla HTML/CSS/JS, fetch |
 | **Control** | Orchestrates web and bot, manages port | `main.py:11` `get_available_port`, `Process(daemon=True)` | multiprocessing, socket |
-| **Domain RAG** | Loads, indexes, searches and answers | `src/rag_engine.py:84` | FAISS, LangChain, Gemini |
-| **Integration** | Telegram polling + escalation | `src/bot.py:23` | python-telegram-bot |
-| **Config** | Variables and secrets | `src/config.py:4` | python-dotenv |
-| **Data** | Single source of truth | `documents/base_conocimiento.md` | Markdown |
+| **Domain RAG** | Loads, indexes, searches and answers | `backend/rag_engine.py:84` | FAISS, LangChain, Gemini |
+| **Integration** | Telegram polling + escalation | `backend/bot.py:23` | python-telegram-bot |
+| **Config** | Variables and secrets | `backend/config.py:4` | python-dotenv |
+| **Data** | Single source of truth | `docs/knowledge/base_conocimiento.md` | Markdown |
 
 ### Question flow
 
@@ -148,40 +148,52 @@ Web ──► src/web_app.py ────────────┘        │ 
 
 ---
 
-## Project structure
+## Project structure (junior-friendly — 3 clear folders)
 
 ```text
 .
-├── main.py                     # launcher, free port, bot in background
-├── requirements.txt
-├── .env.example                # template
-├── .env                        # not versioned (gitignore:7)
-├── README.md / README.en.md    # user guide bilingual
-├── DOCUMENTACION_PROYECTO.md / _EN.md  # this technical doc
-├── documents/
-│   └── base_conocimiento.md    # 256 lines, 9 sections, single source
-├── src/
-│   ├── __init__.py
-│   ├── config.py               # 15 lines, load_dotenv + strip
-│   ├── rag_engine.py           # 540 lines, RAG core + fallback
-│   ├── web_app.py              # 84 lines, Flask + 4 routes
-│   └── bot.py                  # 60 lines, Telegram + escalation
-└── templates/
-    └── index.html              # 284 lines, chat + info-bar + JS fetch
+├── main.py                     # entry point (python main.py) — orchestrates backend + frontend
+├── requirements.txt            # deps: Flask, telegram-bot, langchain, faiss...
+├── .env.example / .env         # template and keys (not versioned, .gitignore:7)
+├── README.md / README.en.md    # user guide (quick start, API, troubleshooting)
+│
+├── backend/                    # 🔧 BACKEND — Python server
+│   ├── config.py               # 15 lines — reads .env
+│   ├── rag_engine.py           # 618 lines — FAISS + Gemini + offline + circuit-breaker
+│   ├── web_app.py              # 90 lines — Flask: /, /api/info, /api/status, /api/chat
+│   ├── bot.py                  # 67 lines — Telegram polling + escalation
+│   └── __init__.py
+│
+├── frontend/                   # 🎨 FRONTEND — visuals
+│   ├── templates/
+│   │   └── index.html          # HTML with Jinja2 + url_for to static
+│   └── static/
+│       ├── css/
+│       │   └── style.css       # 20KB — light/dark vars, sidebar, chat, responsive
+│       └── js/
+│           └── app.js          # 9KB — fetch /api/*, theme, font, sidebar
+│
+└── docs/                       # 📚 DOCS — documentation and knowledge
+    ├── README.md               # docs index
+    ├── DOCUMENTACION_PROYECTO.md      # this doc ES (20 sections)
+    ├── DOCUMENTACION_PROYECTO_EN.md   # doc EN
+    └── knowledge/
+        └── base_conocimiento.md       # single source of truth (256 lines, 9 sections)
 ```
 
-**Changes in corrected version (commit d582f42):**
-- `documents/` consolidated from 3 files to 1 (`base_conocimiento.md` 256 lines).
-- `src/rag_engine.py` from 387 to 540 lines with fast-retry patch, circuit-breaker and 7 offline handlers.
-- `src/web_app.py` fixes `telegram_enabled` and absolute `template_dir`.
-- `src/bot.py` adds validation and error handling.
-- `main.py` adds logs and `PORT` invalid handling.
+**Changes in corrected version:**
+- `src/` → `backend/` (backend = server, clearer for junior)
+- `templates/` → `frontend/templates/` + `frontend/static/css|js` (separate visuals)
+- `documents/` → `docs/knowledge/` (all writing in `docs/`)
+- `DOCUMENTACION_PROYECTO.md` → `docs/` (together with knowledge)
+- `backend/rag_engine.py` from 387 → 618 lines with fast-retry patch, circuit-breaker and courses handler
+- `backend/web_app.py` fixes `telegram_enabled` and absolute `template_dir` to `frontend/templates`
 
 ---
 
 ## Knowledge base
 
-**Location:** `documents/base_conocimiento.md` — UTF-8 Markdown.
+**Location:** `docs/knowledge/base_conocimiento.md` — UTF-8 Markdown.
 
 **Summarized content (9 sections, `grep -c "^##"` → 9):**
 
@@ -222,7 +234,7 @@ HUMAN_AGENT_CHAT_ID=0
 | `HUMAN_AGENT_CHAT_ID` | int | 0 | `int(... or 0)` | 0 disables Telegram escalation |
 | `PORT` | int | 5002 | `int(os.getenv) try/except` | Uses 5002 and finds free |
 
-Never hardcode: everything via `src/config.py:4` `load_dotenv()`.
+Never hardcode: everything via `backend/config.py:4` `load_dotenv()`.
 
 ---
 
@@ -285,7 +297,7 @@ Interfaz web disponible en http://localhost:5002
 
 ## RAG engine — full pipeline
 
-### 1. Load (`src/rag_engine.py:94`)
+### 1. Load (`backend/rag_engine.py:94`)
 ```python
 for file in sorted(os.listdir(doc_dir)):
     if file.endswith(".pdf"): PyPDFLoader
@@ -355,7 +367,7 @@ if time.time() < self._quota_blocked_until: skip_gemini
 
 ## Web application
 
-**`src/web_app.py` (84 lines)**
+**`backend/web_app.py` (84 lines)**
 
 ```python
 app = Flask(__name__, template_folder=abspath("../templates"))
@@ -368,13 +380,13 @@ app = Flask(__name__, template_folder=abspath("../templates"))
 | `/api/status` | GET | `{status:ok, telegram_enabled: bool(TELEGRAM_BOT_TOKEN), rag_ready, vector_store_ready}` | `:59` |
 | `/api/chat` | POST | Validates non-empty `message` → `rag.query()` → `{answer, action, mode}` | `:69` |
 
-**`templates/index.html` (284 lines):** pills grid `#infoBar`, chat bubbles `.msg.user/.bot`, `fetch('/api/info')` with fallback, `fetch('/api/chat')` with `disabled` while waiting.
+**`frontend/templates/index.html` (284 lines):** pills grid `#infoBar`, chat bubbles `.msg.user/.bot`, `fetch('/api/info')` with fallback, `fetch('/api/chat')` with `disabled` while waiting.
 
 ---
 
 ## Telegram bot
 
-**`src/bot.py` (60 lines)**
+**`backend/bot.py` (60 lines)**
 
 ```python
 app = ApplicationBuilder().token(self.token).build()
@@ -408,8 +420,8 @@ app.run_polling()
 ## Security
 
 - `.env` ignored in `.gitignore:7`, never committed. Only `.env.example`.
-- `src/config.py:4` uses `load_dotenv()` + `strip()`.
-- No secrets in `src/`, `documents/` or logs.
+- `backend/config.py:4` uses `load_dotenv()` + `strip()`.
+- No secrets in `backend/`, `docs/knowledge/` or logs.
 - `requirements.txt` has no known critical CVEs (check `pip audit` if needed).
 - Bot uses `parse_mode="Markdown"` only for escalation, not user replies.
 
@@ -422,7 +434,7 @@ Environment: `Python 3.12.3`, `pip check` clean, `py_compile` OK.
 > These commands were actually executed during the fix (commit d582f42).
 
 ```bash
-python -m py_compile src/*.py main.py
+python -m py_compile backend/*.py main.py
 # py_compile OK
 
 python -c "from src.rag_engine import RAGEngine; r=RAGEngine.__new__(RAGEngine); r.doc_dir='documents'; r.cache={}; r.vector_store=None; r._load_documents(); print(r._offline_response('hola', []))"

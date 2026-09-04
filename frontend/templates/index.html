@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sora AI Support — Academia de Tecnología e IA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="layout" id="layout">
+    <aside class="sidebar" id="sidebar" aria-label="Información rápida">
+      <div class="sidebar-header">
+        <div class="brand">
+          <div class="brand-mark">S</div>
+          <div class="brand-text">
+            <div class="brand-title">Sora AI</div>
+            <div class="brand-sub">Academia de Tecnología e IA</div>
+          </div>
+          <button class="icon-btn" id="closeSidebar" aria-label="Cerrar panel" style="margin-left:auto; width:36px; height:36px;">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="sidebar-title">
+          <h2>Información rápida</h2>
+          <span class="badge-live"><i></i> En vivo</span>
+        </div>
+      </div>
+
+      <div class="sidebar-scroll" id="sidebarScroll">
+        <div class="stats" id="quickStats">
+          <div class="stat"><strong>3</strong><span>Cursos</span></div>
+          <div class="stat"><strong>$150</strong><span>Desde</span></div>
+          <div class="stat"><strong>7d</strong><span>Reembolso</span></div>
+        </div>
+
+        <section class="card" aria-labelledby="coursesTitle">
+          <div class="card-head">
+            <div class="card-icon courses">
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3L2 8l10 5 10-5-10-5z"/><path d="M7 12v3l5 3 5-3v-3"/><path d="M12 13v8"/><path d="M2 8v8"/><path d="M22 8v8"/></svg>
+            </div>
+            <div>
+              <div class="card-title" id="coursesTitle">Cursos disponibles</div>
+              <div class="card-sub">Elige tu ruta — 3 programas</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="course-list" id="coursesList">
+              <div class="course"><span class="course-dot"></span><div><div class="course-name">Desarrollo de Bots con Telegram e IA</div><div class="course-meta">4 semanas · 20h · Intermedio · Online en vivo Zoom</div></div></div>
+              <div class="course"><span class="course-dot"></span><div><div class="course-name">Python para Ciencia de Datos e IA</div><div class="course-meta">8 semanas · 40h · Desde cero · Asincrónico + tutorías</div></div></div>
+              <div class="course"><span class="course-dot"></span><div><div class="course-name">Prompt Engineering y Agentes de IA</div><div class="course-meta">4 semanas · 20h · Principiante-Intermedio · En vivo + labs</div></div></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card" aria-labelledby="priceTitle">
+          <div class="card-head">
+            <div class="card-icon price">
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 14h3M9 14h.01"/></svg>
+            </div>
+            <div>
+              <div class="card-title" id="priceTitle">Precios y financiación</div>
+              <div class="card-sub">Pronto pago hasta el 20</div>
+            </div>
+          </div>
+          <div class="card-body" style="padding:0">
+            <table class="price-table" id="priceTable" aria-label="Tabla de precios">
+              <thead><tr><th>Curso</th><th>Regular</th><th>Pronto pago</th></tr></thead>
+              <tbody>
+                <tr><td>Bots con Telegram e IA</td><td class="price">$150<small> USD</small></td><td class="price">$120 <small>USD</small></td></tr>
+                <tr><td>Python para Data Science</td><td class="price">$280<small> USD</small></td><td class="price">$230 <small>USD</small></td></tr>
+                <tr><td>Prompt Eng. y Agentes</td><td class="price">$160<small> USD</small></td><td class="price">$130 <small>USD</small></td></tr>
+              </tbody>
+            </table>
+            <div style="padding:10px 14px; font-size:0.72rem; color:var(--muted); line-height:1.4">
+              2 cuotas sin interés · 3 cuotas para Python · Descuento exalumnos 15% · Grupal 20-30%
+            </div>
+          </div>
+        </section>
+
+        <section class="card" aria-labelledby="hoursTitle">
+          <div class="card-head">
+            <div class="card-icon hours">
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            </div>
+            <div>
+              <div class="card-title" id="hoursTitle">Horarios y soporte</div>
+              <div class="card-sub" id="hoursSub">Lun-Vie 8:00-18:00 GMT-5 · Sáb 9:00-13:00</div>
+            </div>
+          </div>
+          <div class="card-body" style="padding:0">
+            <div class="contact-grid" style="padding:12px 14px">
+              <a class="contact-item" href="mailto:soporte@academiatech.com" id="supportEmailWrap">
+                <span class="contact-ic">
+                  <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+                </span>
+                <span><span class="contact-label">Soporte</span><span class="contact-value" id="supportEmail">soporte@academiatech.com</span></span>
+              </a>
+              <a class="contact-item" href="mailto:admisiones@academiatech.com">
+                <span class="contact-ic">
+                  <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3L2 8l10 5 10-5-10-5z"/><path d="M7 12v3l5 3 5-3v-3"/></svg>
+                </span>
+                <span><span class="contact-label">Admisiones</span><span class="contact-value" id="admissionsEmail">admisiones@academiatech.com</span></span>
+              </a>
+              <a class="contact-item" href="https://t.me/SoporteAcademiaBot" target="_blank" rel="noopener">
+                <span class="contact-ic">
+                  <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 11.5a8.5 8.5 0 0 1-12.5 7.5L3 21l2-5.5A8.5 8.5 0 0 1 21 11.5z"/><path d="M8 12h8M8 8h5"/></svg>
+                </span>
+                <span><span class="contact-label">Bot 24/7</span><span class="contact-value">@SoporteAcademiaBot</span></span>
+              </a>
+            </div>
+          </div>
+        </section>
+
+        <section class="card" aria-labelledby="stepsTitle">
+          <div class="card-head">
+            <div class="card-icon steps">
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M8 6h10M8 12h10M8 18h10"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>
+            </div>
+            <div>
+              <div class="card-title" id="stepsTitle">Inscripción en 5 pasos</div>
+              <div class="card-sub">Desde solicitud hasta acceso LMS</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="steps">
+              <div class="step"><span class="step-n">1</span><div><div class="step-title">Solicitud</div><div class="step-desc">Formulario de pre-inscripción en la web</div></div></div>
+              <div class="step"><span class="step-n">2</span><div><div class="step-title">Selección</div><div class="step-desc">Elige cohorte, modalidad y horario</div></div></div>
+              <div class="step"><span class="step-n">3</span><div><div class="step-title">Pago</div><div class="step-desc">Stripe, SPEI/PSE/SEPA/Mercado Pago, cripto</div></div></div>
+              <div class="step"><span class="step-n">4</span><div><div class="step-title">Validación</div><div class="step-desc">Tarjeta instantáneo · Transferencia &lt;24h</div></div></div>
+              <div class="step"><span class="step-n">5</span><div><div class="step-title">Acceso</div><div class="step-desc">Correo con credenciales LMS + Discord</div></div></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card" aria-labelledby="guaranteeTitle">
+          <div class="card-head">
+            <div class="card-icon guarantee">
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3l7 3v5c0 3.5-2.5 6.5-7 8-4.5-1.5-7-4.5-7-8V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>
+            </div>
+            <div>
+              <div class="card-title" id="guaranteeTitle">Garantía 7 días</div>
+              <div class="card-sub">Devolución 100% sin preguntas</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <p style="font-size:0.80rem; color:var(--muted); line-height:1.5">Si no quedas satisfecho, solicita reembolso dentro de los <strong style="color:var(--text-strong)">7 días naturales</strong> tras el inicio. Se procesa en 5-10 días hábiles por el mismo medio de pago. También puedes congelar 1 vez hasta 6 meses.</p>
+          </div>
+        </section>
+
+        <div style="font-size:0.68rem; color:var(--muted-2); text-align:center; padding:6px 0 4px; font-weight:600; letter-spacing:0.03em">
+          Fuente única: <code style="font-family:'JetBrains Mono',monospace; font-size:0.66rem; background:var(--panel-soft); border:1px solid var(--card-border); padding:2px 6px; border-radius:6px">documents/base_conocimiento.md</code>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="control-group">
+          <div class="control-label">Tema <span id="themeLabel">Oscuro</span></div>
+          <div class="control-row">
+            <div class="seg" role="group" aria-label="Tema">
+              <button id="themeLight" aria-label="Modo claro">
+                <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+                Claro
+              </button>
+              <button id="themeDark" class="active" aria-label="Modo oscuro">
+                <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                Oscuro
+              </button>
+            </div>
+            <button class="icon-btn" id="themeToggle" aria-label="Cambiar tema" title="Cambiar tema">
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <div class="control-label">Tamaño de letra <span id="fontLabel">100%</span></div>
+          <div class="control-row" style="gap:10px">
+            <button class="icon-btn" id="fontDown" aria-label="Disminuir letra">
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 12h8M14 12l-3-3M14 12l-3 3"/></svg>
+            </button>
+            <input class="range" id="fontRange" type="range" min="85" max="130" step="5" value="100" aria-label="Tamaño de letra">
+            <button class="icon-btn" id="fontUp" aria-label="Aumentar letra">
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 8v8M8 12h8"/></svg>
+            </button>
+          </div>
+          <div class="hint-mini"><span>Pequeño</span><span>Grande</span></div>
+        </div>
+
+        <div class="control-group">
+          <div class="control-label">Experiencia</div>
+          <div class="control-row">
+            <div class="seg" role="group" aria-label="Densidad">
+              <button id="densityComfort" class="active">Cómodo</button>
+              <button id="densityCompact">Compacto</button>
+            </div>
+            <button class="icon-btn" id="resetBtn" title="Restablecer" aria-label="Restablecer">
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 12a9 9 0 1 0 9-9"/><path d="M3 3v6h6"/></svg>
+            </button>
+          </div>
+          <label style="display:flex; align-items:center; gap:8px; margin-top:10px; font-size:0.78rem; font-weight:600; color:var(--muted); cursor:pointer">
+            <input type="checkbox" id="animToggle" checked style="accent-color: var(--primary)"> Animaciones
+          </label>
+        </div>
+      </div>
+    </aside>
+
+    <div class="overlay" id="overlay" aria-hidden="true"></div>
+
+    <main class="main" aria-label="Chat con Sora">
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="hamburger" id="openSidebar" aria-label="Abrir información rápida">
+            <svg class="ico-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+          </button>
+          <div class="topbar-title">
+            <strong>Sora · Asistente de la Academia</strong>
+            <span><span class="status"><i></i> Online</span> Respuestas con base oficial · Escalamiento humano</span>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <button class="pill-btn" id="quickInfoBtn" aria-label="Ver información rápida">
+            <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+            Info
+          </button>
+          <button class="icon-btn" id="topThemeBtn" aria-label="Tema">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <div class="chat-wrap">
+        <div class="chat" id="chat" role="log" aria-live="polite" aria-label="Conversación"></div>
+        <div class="suggestions" id="suggestions" aria-label="Sugerencias rápidas">
+          <button class="chip" data-q="¿Qué cursos tienen?">
+            <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3L2 8l10 5 10-5-10-5z"/><path d="M7 12v3l5 3 5-3v-3"/></svg>
+            Cursos
+          </button>
+          <button class="chip" data-q="¿Cuánto cuesta el curso de bots?">
+            <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+            Precios
+          </button>
+          <button class="chip" data-q="¿Cómo me inscribo?">
+            <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M8 6h10M8 12h10M8 18h10"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>
+            Inscripción
+          </button>
+          <button class="chip" data-q="¿Cómo pedir reembolso?">
+            <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3l7 3v5c0 3.5-2.5 6.5-7 8-4.5-1.5-7-4.5-7-8V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>
+            Reembolso
+          </button>
+          <button class="chip" data-q="¿Cuál es el horario de atención?">
+            <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            Horarios
+          </button>
+          <button class="chip" data-q="¿Requisitos del curso de bots?">
+            <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+            Requisitos
+          </button>
+        </div>
+      </div>
+
+      <div class="composer-wrap">
+        <div class="composer" id="composer">
+          <textarea id="message" rows="1" placeholder="Escribe tu consulta sobre cursos, precios o matrícula..." aria-label="Mensaje"></textarea>
+          <button class="send-btn" id="sendBtn" aria-label="Enviar">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/></svg>
+          </button>
+        </div>
+        <div class="composer-hint">
+          <span>Presiona <kbd>Enter</kbd> para enviar · <kbd>Shift</kbd>+<kbd>Enter</kbd> salto de línea</span>
+          <span style="display:flex; gap:8px; align-items:center">
+            <span id="charCount" style="font-family:'JetBrains Mono',monospace; font-size:0.66rem; opacity:0.7">0</span>
+          </span>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
