@@ -28,6 +28,8 @@ except ImportError:  # pragma: no cover
     ChatGoogleGenerativeAI = None
     GoogleGenerativeAIEmbeddings = None
 
+ESCALATE_MSG = "No tengo esa información disponible contacto con un asesor humano en sora@mail.com"
+
 SEARCH_ALIASES = {
     "requisito": ["requisito", "prerrequisito", "preparacion", "preparación", "antes de empezar", "necesita", "necesitas", "se requiere", "se necesita", "requisitos previos", "pre-requisito", "conocimientos previos"],
     "precio": ["precio", "cost", "costo", "cuanto", "cuánto", "pago", "descuento", "tarifa", "valor", "cuesta", "cuestan", "precio del curso", "cuanto cuesta", "cual es el precio", "valores", "inversión", "quanto", "arancel"],
@@ -39,6 +41,7 @@ SEARCH_ALIASES = {
     "profesor": ["profesor", "instructor", "docente", "mentor", "quien enseña", "quién enseña", "facilitador", "tutor", "equipo docente"],
     "contenido": ["contenido", "temario", "módulo", "tema", "qué aprendo", "qué se enseña", "programa", "syllabus", "plan de estudio"],
     "certificado": ["certificado", "diploma", "constancia", "acreditación", "titulación", "credenciales"],
+    "cursos": ["curso", "cursos", "oferta academica", "programa", "formacion", "que cursos", "lista de cursos"],
 }
 
 STOPWORDS = {
@@ -271,7 +274,7 @@ class RAGEngine:
         if not docs and not self.raw_documents:
             return {
                 "action": "escalate",
-                "message": "Todavía no tengo información suficiente en esta base de conocimiento para responderte. Puedes intentar otra pregunta o contactar con un asesor humano.",
+                "message": ESCALATE_MSG,
                 "mode": "offline",
             }
 
@@ -465,6 +468,23 @@ class RAGEngine:
                     if "modalidad" in text_normalized and len(line.strip()) > 15:
                         return {"action": "reply", "message": line.strip(), "mode": "offline"}
 
+        # --- Búsqueda de cursos / oferta académica (solo si no fue manejado antes) ---
+        cursos_triggers = ["cursos", "que curso", "que cursos", "lista de cursos", "cursos disponibles", "cuales son los cursos", "oferta academica", "oferta académica", "que ofrecen", "catalogo", "cursos hay", "cursos tienen", "programas disponibles"]
+        if any(t in q for t in cursos_triggers):
+            cursos = re.findall(r"^###\s+Curso\s*\d+:\s*(.+)$", text, flags=re.MULTILINE)
+            if cursos:
+                detalles = []
+                for idx, nombre in enumerate(cursos[:3], start=1):
+                    dur_match = re.search(rf"Curso\s*{idx}[^\n]*\n\* \*\*Duración:\*\*\s*([^\n]+)", text)
+                    dur = dur_match.group(1).strip() if dur_match else ""
+                    if dur:
+                        detalles.append(f"{nombre.strip()} — {dur}")
+                    else:
+                        detalles.append(nombre.strip())
+                if detalles:
+                    # priorizar lista completa para preguntas genéricas
+                    return {"action": "reply", "message": "Según la base de conocimiento, los cursos disponibles son:\n- " + "\n- ".join(detalles), "mode": "offline"}
+
         # --- Búsqueda por líneas coincidentes como último recurso ---
         best_lines = self._best_matching_lines(question, text.splitlines(), min_score=5)
         if best_lines:
@@ -481,20 +501,20 @@ class RAGEngine:
         if not q_tokens_filtered:
             return {
                 "action": "escalate",
-                "message": "No tengo una respuesta exacta en la base de conocimiento. Puedes intentar reformular la pregunta o contactar con un asesor humano.",
+                "message": ESCALATE_MSG,
                 "mode": "offline",
             }
         # si ningún token filtrado aparece en el texto, escalar directamente
         if not any(tok in text_normalized for tok in q_tokens_filtered):
             return {
                 "action": "escalate",
-                "message": "Lo siento, esa consulta está fuera del alcance de mi base de conocimiento. Un asesor humano te contactará pronto.",
+                "message": ESCALATE_MSG,
                 "mode": "offline",
             }
 
         return {
             "action": "escalate",
-            "message": "No tengo una respuesta exacta en la base de conocimiento. Puedes intentar reformular la pregunta o contactar con un asesor humano.",
+            "message": ESCALATE_MSG,
             "mode": "offline",
         }
 
@@ -525,7 +545,7 @@ class RAGEngine:
                 if "ESCALATE_TO_HUMAN" in content:
                     return {
                         "action": "escalate",
-                        "message": "Lo siento, no tengo esa información exacta en mi base de conocimientos. Un asesor humano te contactará pronto.",
+                        "message": ESCALATE_MSG,
                         "mode": "gemini",
                     }
                 return {"action": "reply", "message": content, "mode": "gemini"}
