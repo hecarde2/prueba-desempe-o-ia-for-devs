@@ -1,3 +1,4 @@
+import concurrent.futures
 import os
 import re
 import time
@@ -70,11 +71,7 @@ Assistant: Puedes solicitar la devolución del 100% de tu dinero dentro de los p
 
 GEMINI_CHAT_MODELS = [
     GEMINI_MODEL,
-    "gemini-2.5-flash-lite",
     "gemini-flash-latest",
-    "gemini-3.6-flash",
-    "gemini-3.5-flash",
-    "gemini-3-flash-preview",
 ]
 GEMINI_EMBEDDING_MODELS = [
     GEMINI_EMBEDDING_MODEL,
@@ -89,7 +86,8 @@ class RAGEngine:
         self.vector_store = None
         self.raw_documents = []
         self.cache = {}
-        self._quota_blocked_until = 0  # timestamp para circuit breaker de Gemini
+        self._quota_blocked_until = 0  # timestamp para circuit breaker de Gemini (chat)
+        self._embed_blocked_until = 0  # circuit breaker para embeddings
         self._load_documents()
         if GOOGLE_API_KEY and GoogleGenerativeAIEmbeddings and ChatGoogleGenerativeAI:
             self._init_vector_store()
@@ -119,14 +117,29 @@ class RAGEngine:
             chunks = text_splitter.split_documents(self.raw_documents)
 
             for model_name in GEMINI_EMBEDDING_MODELS:
+                # si embeddings bloqueado por cuota, no intentar
+                if time.time() < self._embed_blocked_until:
+                    print("Embeddings bloqueado por cuota reciente, usando modo offline.")
+                    break
                 try:
-                    embeddings = GoogleGenerativeAIEmbeddings(model=model_name)
+                    embeddings = GoogleGenerativeAIEmbeddings(
+                        model=model_name,
+                        request_options={"timeout": 5},
+                    )
                     self.vector_store = FAISS.from_documents(chunks, embeddings)
+                    print(f"Vector store inicializado con {model_name} ({len(chunks)} chunks).")
                     return
                 except Exception as exc:  # pragma: no cover
-                    print(f"Embeddings {model_name} no disponible: {exc}")
+                    msg = str(exc).lower()
+                    if "429" in str(exc) or "quota" in msg or "resourceexhausted" in msg:
+                        print(f"Embeddings {model_name} cuota excedida: {exc}")
+                        self._embed_blocked_until = time.time() + 60
+                    else:
+                        print(f"Embeddings {model_name} no disponible: {exc}")
 
             self.vector_store = None
+            if time.time() < self._embed_blocked_until:
+                print("Vector DB en modo offline por cuota de embeddings.")
         except Exception as exc:  # pragma: no cover
             print(f"Vector DB no disponible; usando modo offline. Detalle: {exc}")
             self.vector_store = None
@@ -485,6 +498,53 @@ class RAGEngine:
             "mode": "offline",
         }
 
+    def _gemini_attempt(self, question: str) -> dict | None:
+        """Intento único de Gemini con timeout controlado. Retorna dict si tuvo éxito, None si debe hacer fallback."""
+        # si embeddings bloqueados, no intentar similarity_search
+        if time.time() < self._embed_blocked_until:
+            raise RuntimeError("Embeddings bloqueado por cuota")
+
+        docs = self.vector_store.similarity_search(question, k=3)
+        context = "\n---\n".join(doc.page_content for doc in docs)
+
+        last_error = None
+        for model_name in GEMINI_CHAT_MODELS:
+            try:
+                llm = ChatGoogleGenerativeAI(
+                    model=model_name,
+                    temperature=0.1,
+                    max_retries=0,
+                )
+                messages = [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"},
+                ]
+                response = llm.invoke(messages)
+                content = response.content.strip()
+
+                if "ESCALATE_TO_HUMAN" in content:
+                    return {
+                        "action": "escalate",
+                        "message": "Lo siento, no tengo esa información exacta en mi base de conocimientos. Un asesor humano te contactará pronto.",
+                        "mode": "gemini",
+                    }
+                return {"action": "reply", "message": content, "mode": "gemini"}
+
+            except Exception as exc:  # pragma: no cover
+                last_error = exc
+                msg = str(exc).lower()
+                if "429" in str(exc) or "quota" in msg or "resourceexhausted" in msg:
+                    print(f"Gemini alcanzó cuota o límite: {exc}")
+                    self._quota_blocked_until = time.time() + 60
+                    # en cuota, no probar más modelos, ir directo a offline
+                    raise RuntimeError(f"Quota excedida en {model_name}") from exc
+                # error de modelo (404) → probar siguiente rápido
+                print(f"Modelo Gemini {model_name} no disponible: {exc}")
+
+        if last_error:
+            raise last_error
+        return None
+
     def query(self, question: str) -> dict:
         normalized_q = question.strip().lower()
         if not normalized_q:
@@ -492,58 +552,45 @@ class RAGEngine:
         if normalized_q in self.cache:
             return self.cache[normalized_q]
 
-        # Circuit breaker: si Gemini está bloqueado por cuota, ir directo a offline
+        # Circuit breaker: si Gemini está bloqueado por cuota, ir directo a offline (ultra rápido)
         use_gemini = bool(self.vector_store and GOOGLE_API_KEY and ChatGoogleGenerativeAI)
         if use_gemini and time.time() < self._quota_blocked_until:
+            use_gemini = False
+        if use_gemini and time.time() < self._embed_blocked_until:
             use_gemini = False
 
         if use_gemini:
             try:
-                docs = self.vector_store.similarity_search(question, k=3)
-                context = "\n---\n".join(doc.page_content for doc in docs)
-
-                last_error = None
-                for model_name in GEMINI_CHAT_MODELS:
+                # Timeout total de 2.5s para todo el intento Gemini (embedding + LLM)
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(self._gemini_attempt, question)
                     try:
-                        llm = ChatGoogleGenerativeAI(
-                            model=model_name,
-                            temperature=0.1,
-                            max_retries=0,
-                        )
-                        messages = [
-                            {"role": "system", "content": SYSTEM_PROMPT},
-                            {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"},
-                        ]
-                        response = llm.invoke(messages)
-                        content = response.content.strip()
-
-                        if "ESCALATE_TO_HUMAN" in content:
-                            result = {
-                                "action": "escalate",
-                                "message": "Lo siento, no tengo esa información exacta en mi base de conocimientos. Un asesor humano te contactará pronto.",
-                                "mode": "gemini",
-                            }
-                        else:
-                            result = {"action": "reply", "message": content, "mode": "gemini"}
+                        result = future.result(timeout=2.5)
+                        if result:
                             self.cache[normalized_q] = result
-                        return result
-                    except Exception as exc:  # pragma: no cover
-                        last_error = exc
-                        msg = str(exc).lower()
-                        if "429" in str(exc) or "quota" in msg or "resourceexhausted" in msg:
-                            print(f"Gemini alcanzó cuota o límite: {exc}")
-                            self._quota_blocked_until = time.time() + 60
-                        else:
-                            print(f"Modelo Gemini {model_name} no disponible: {exc}")
-
-                print(f"Ningún modelo Gemini disponible; usando fallback offline. Último error: {last_error}")
+                            return result
+                    except concurrent.futures.TimeoutError:
+                        print("Gemini timeout (2.5s), usando fallback offline")
+                        self._quota_blocked_until = time.time() + 30
+                        # cancelar tarea en background
+                        future.cancel()
+            except RuntimeError as exc:
+                # quota ya manejada, ir a offline
+                msg = str(exc).lower()
+                if "429" in msg or "quota" in msg or "embeddings bloqueado" in msg:
+                    self._quota_blocked_until = time.time() + 60
+                # no reintentar, caer a offline
+                pass
             except Exception as exc:  # pragma: no cover
                 msg = str(exc).lower()
                 if "429" in str(exc) or "quota" in msg or "resourceexhausted" in msg:
                     self._quota_blocked_until = time.time() + 60
+                # errores de embedding también bloquean
+                if "embed" in msg and ("429" in msg or "quota" in msg):
+                    self._embed_blocked_until = time.time() + 60
                 print(f"Gemini no disponible; usando fallback offline. Detalle: {exc}")
 
-        # Fallback inmediato para evitar esperas largas cuando Gemini está agotado por cuota.
+        # Fallback inmediato y rápido (< 5ms)
         docs = self._offline_search(question)
         result = self._offline_response(question, docs)
         self.cache[normalized_q] = result
