@@ -21,25 +21,37 @@ class TelegramRAGBot:
         )
 
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        user_text = update.message.text
+        if not update.message or not update.message.text:
+            return
+        user_text = update.message.text.strip()
+        if not user_text:
+            await update.message.reply_text("Escribe una pregunta para empezar.")
+            return
         chat_id = update.message.chat_id
-        username = update.message.from_user.username or update.message.from_user.first_name
+        username = update.message.from_user.username or update.message.from_user.first_name or "Usuario"
 
-        result = self.rag_engine.query(user_text)
+        try:
+            result = self.rag_engine.query(user_text)
+            await update.message.reply_text(result["message"])
+        except Exception as exc:
+            logging.error(f"Error al procesar mensaje de @{username}: {exc}")
+            await update.message.reply_text("Ocurrió un error al procesar tu consulta. Intenta nuevamente o contacta a soporte@academiatech.com")
+            result = {"action": "escalate"}
 
-        await update.message.reply_text(result["message"])
-
-        if result["action"] == "escalate" and self.human_agent_id:
-            escalation_msg = (
-                f"⚠️ *Escalamiento Requerido*\n"
-                f"Usuario: @{username} (ID: `{chat_id}`)\n"
-                f"Consulta: {user_text}"
-            )
-            await context.bot.send_message(
-                chat_id=self.human_agent_id,
-                text=escalation_msg,
-                parse_mode="Markdown"
-            )
+        if result.get("action") == "escalate" and self.human_agent_id:
+            try:
+                escalation_msg = (
+                    f"⚠️ *Escalamiento Requerido*\n"
+                    f"Usuario: @{username} (ID: `{chat_id}`)\n"
+                    f"Consulta: {user_text}"
+                )
+                await context.bot.send_message(
+                    chat_id=self.human_agent_id,
+                    text=escalation_msg,
+                    parse_mode="Markdown"
+                )
+            except Exception as exc:
+                logging.warning(f"No se pudo notificar al agente humano: {exc}")
 
     def run(self):
         if not self.token:

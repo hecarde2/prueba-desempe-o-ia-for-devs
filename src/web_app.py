@@ -3,11 +3,14 @@ import re
 
 from flask import Flask, jsonify, request, render_template
 
+from src.config import TELEGRAM_BOT_TOKEN
 from src.rag_engine import RAGEngine
 
 
 def create_app(rag_engine: RAGEngine | None = None):
-    app = Flask(__name__, template_folder="../templates")
+    template_dir = os.path.join(os.path.dirname(__file__), "..", "templates")
+    template_dir = os.path.abspath(template_dir)
+    app = Flask(__name__, template_folder=template_dir)
     app.config["JSON_SORT_KEYS"] = False
 
     rag = rag_engine or RAGEngine()
@@ -29,7 +32,10 @@ def create_app(rag_engine: RAGEngine | None = None):
             prices = re.findall(r"\*\*\s*([^*]+?)\s*\*\*\s*\|\s*\$(\d+)\s*USD", content)
             support = re.findall(r"\*\*Atención a Estudiantes y Soporte:\*\*\s*`([^`]+)`", content)
             admisiones = re.findall(r"\*\*Ventas, Becas y Admisiones:\*\*\s*`([^`]+)`", content)
-            horarios = re.findall(r"\*\*Horarios de Atención Directa:\*\*\s*\*\*([^*]+)\*\*", content)
+            horarios = re.findall(r"Atención Administrativa y Soporte:\*\*\s*([^\n]+)", content)
+            # fallback: try Horarios de Atención Directa header
+            if not horarios:
+                horarios = re.findall(r"Horarios de Atención Directa[^\n]*\n[^\n]*?(\bLunes a Viernes[^\n]+)", content)
 
             if course_names:
                 items.append({"label": "Cursos", "value": ", ".join(course_names[:3])})
@@ -41,7 +47,9 @@ def create_app(rag_engine: RAGEngine | None = None):
             if admisiones:
                 items.append({"label": "Admisiones", "value": admisiones[0]})
             if horarios:
-                items.append({"label": "Horario", "value": horarios[0]})
+                # limpiar markdown y espacios
+                horario_clean = horarios[0].strip().strip("*").strip()
+                items.append({"label": "Horario", "value": horario_clean})
         except Exception:
             items = [
                 {"label": "Cursos", "value": "Bots con Telegram e IA · Python · Prompt Engineering"},
@@ -58,7 +66,9 @@ def create_app(rag_engine: RAGEngine | None = None):
         return jsonify({
             "status": "ok",
             "name": "Sora AI Support",
-            "telegram_enabled": bool(rag and getattr(rag, "vector_store", None) is not None),
+            "telegram_enabled": bool(TELEGRAM_BOT_TOKEN),
+            "rag_ready": bool(rag and len(getattr(rag, "raw_documents", [])) > 0),
+            "vector_store_ready": bool(rag and getattr(rag, "vector_store", None) is not None),
         })
 
     @app.route("/api/chat", methods=["POST"])

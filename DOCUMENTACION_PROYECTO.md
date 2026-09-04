@@ -196,3 +196,18 @@ Este proyecto fue desarrollado como entregable funcional con:
 - integración con Gemini
 - escalamiento humano
 - documentación y ejecución estable
+
+
+Lenguaje: Python (versión 3.12 según la barra de estado).
+
+Modelos de IA: Google Gemini (ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings).
+
+Framework de IA: LangChain (langchain_community, langchain_google_genai, langchain_text_splitters).
+
+Base de Datos Vectorial / Búsqueda: FAISS (FAISS).
+
+Procesamiento de Documentos: PyPDFLoader y TextLoader para lectura, además de RecursiveCharacterTextSplitter para fragmentar el texto.
+
+Interfaz / Backend: Por las pestañas abiertas (web_app.py, templates/index.html y el puerto local :5002), utiliza un framework web en Python (como Flask o FastAPI) acoplado a HTML/CSS básico para la interfaz gráfica del bot.
+
+Agente IA: Desarrolla un asistente de soporte llamado "Sora" para consultas sobre cursos, horarios, precios e inscripciones.
